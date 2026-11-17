@@ -2,7 +2,7 @@
 
 一个本地优先的角色伙伴原型：以单一角色为中心的简洁陪伴窗口，三种可选性格、离线互动、长期记忆与 OpenAI Agent 文字对话。
 
-当前完成 Linux 桌面原型。macOS 已补齐原生库装配和自动打包流程，但仍待 Mac 构建与真机验证。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
+当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、9 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
 
 ## 现在可以做什么
 
@@ -14,7 +14,7 @@
 - 配置 OpenAI API Key 与账号可用的模型 ID 后，使用 Responses API 进行文字聊天，支持记忆检索、状态读取、表情安排和待确认记忆的函数调用循环。
 - 没有 Key、断网、超时或 API 返回错误时，保留输入，小屋继续可用。
 
-本轮不包含语音、摄像头、屏幕理解、透明桌面悬浮、无需确认的自动记忆保存、云同步和安装包签名。这些是后续阶段，不显示成已经可用的按钮。
+本轮不包含语音、摄像头、屏幕理解、透明桌面悬浮、无需确认的自动记忆保存、云同步和正式发行签名/公证。这些是后续阶段，不显示成已经可用的按钮。
 
 ## 在 Linux 上启动
 
@@ -92,6 +92,10 @@ dart scripts/check-agent.dart
 
 ## macOS 测试包
 
-目标交付为包含 Apple Silicon 和 Intel 架构的 `Alice.app`，测试者无需开发环境。构建脚本为 `scripts/build-macos.sh`，自动构建流程为 `.github/workflows/macos-test.yml`。这些必须在 macOS + Xcode 构建机上执行；当前 Linux 环境尚未产出可运行的 Mac 应用。
+已生成包含 Apple Silicon 和 Intel 架构的 `Alice.app`，测试者无需开发环境。
+
+[下载 macOS 测试包](https://github.com/sketcherrr/alice/actions/runs/44062425991/artifacts/14318149867)（需登录 GitHub，附件保留至 2026-12-01）。解压下载附件，再解压其中的 `Alice-macOS-universal-test.zip`，将 `Alice.app` 拖入“应用程序”。本地已取回同名应用压缩包，位于 `dist/`。
+
+测试版使用临时签名，尚未通过 Apple 公证；首次打开被系统阻止时，可前往“系统设置 → 隐私与安全性”允许打开。构建脚本为 `scripts/build-macos.sh`，自动构建流程为 `.github/workflows/macos-test.yml`；后续相关代码提交会自动生成新测试包。
 
 详情见 [macOS 测试版构建](docs/macos-testing.md)。

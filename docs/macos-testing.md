@@ -1,14 +1,22 @@
 # macOS 测试版构建
 
-交付目标是一个可直接运行的 `Alice.app`，测试者不需要安装 Xcode、Flutter 或 Rust。当前准备的是构建流程；在 macOS runner 成功执行前，不把源码压缩包称作 Mac 应用。
+已交付可直接运行的 `Alice.app`，测试者不需要安装 Xcode、Flutter 或 Rust。
 
 ## 当前状态
 
-- Linux 工作机没有 Xcode，无法执行 Flutter macOS 编译。
-- 已补齐 macOS 核心 dylib 装配、运行时查找路径、Foundation 存档目录、出站联网权限和 480×760 窗口。
-- 已准备 Apple Silicon + Intel 通用应用的构建、嵌套代码签名、资源/架构校验和 GitHub Actions 工作流。
-- 尚未在 Mac 编译或运行，也尚未得到真实 `.app`。
-- `dist/Alice-macOS-build-input.zip` 只是供构建机使用的源码与素材输入，不能当作应用安装。它排除了 Key、用户存档、本机构建目录和 SDK 缓存。
+- 2026-11-17 在 GitHub macOS 15 / ARM64 构建机成功生成 Apple Silicon + Intel 通用应用；[构建与测试记录](https://github.com/sketcherrr/alice/actions/runs/44062425991)。
+- 应用对应源码提交 `d92649a29aee89c23eac1c67927e8a12163b86ee`，使用 Flutter 3.47.9、Xcode 16.4 和 Rust 1.100.0。
+- 已验证双架构、嵌套签名、字体/动画、FFI 导出、沙盒及出站联网权限；静态分析无问题，9 项 Flutter 测试通过，实际 Rust/SQLite 与模拟 OpenAI Agent 检查通过。
+- 已下载并再次核对附件哈希、应用压缩包完整性、四个二进制的架构切片与 framework 符号链接。桌面人工体验、Intel 真机与最低系统版本仍待测试；未调用真实 OpenAI API。
+- [下载测试附件](https://github.com/sketcherrr/alice/actions/runs/44062425991/artifacts/14318149867)，需登录 GitHub，保留至 2026-12-01。附件内包含应用压缩包及 SHA-256 文件；本地副本位于 `dist/`。
+
+`Alice-macOS-universal-test.zip` 的 SHA-256：
+
+```text
+45127b3707c178036c4870368aba5f54105873debe571379e16e185250a1c1cd
+```
+
+旧的 `dist/Alice-macOS-build-input.zip` 只是源码与素材输入，不能作为应用安装。
 
 ## 在 macOS 构建机生成应用
 
@@ -38,11 +46,11 @@
 - 可以手动启动，也可由 main/master、`build/macos-test/**` 分支的相关代码提交或 PR 触发。
 - 最长运行 45 分钟，构建产物保留 14 天；使用该 GitHub 账户的 Actions 配额。
 
-必须先确定并授权一个用于存放此项目代码的仓库，才能上传代码并运行。本轮没有上传到任何外部仓库。
+源码与工作流已上传至用户指定的 [sketcherrr/alice](https://github.com/sketcherrr/alice)。附件过期后，可从 Actions 的 `macOS test app` 工作流手动重新构建。
 
 ## 测试者拿到应用后
 
-解压最终 **universal-test** 压缩包，将完整 `Alice.app` 拖到“应用程序”后打开。在右上角抽屉配置自己的 OpenAI Key 和模型 ID；Key 不随构建包提供。
+从 GitHub 下载时先解压附件，再解压其中的 `Alice-macOS-universal-test.zip`；使用本地 `dist/` 中的同名应用压缩包时只需解压一次。将完整 `Alice.app` 拖到“应用程序”后打开。在右上角「…」→「连接 OpenAI」配置自己的 OpenAI Key 和模型 ID；Key 不随构建包提供。
 
 这是临时签名的内部测试版，尚未使用 Developer ID 签名或经 Apple 公证。macOS 可能要求在“系统设置 → 隐私与安全性”中确认允许打开。正式公开发布前需单独完成签名、公证和安装分发验证，不通过脚本修改系统安全设置。
 

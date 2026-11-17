@@ -33,7 +33,7 @@ SQLite 通过一个小型 C ABI 封装使用系统 SQLite 库。所有状态修�
 |---|---|
 | Linux x64 | 编译完成，Rust/FFI/引擎内交互检查；桌面显示服务器会话另行验证 |
 | Linux ARM64 / 树莓派 | 架构兼容目标；仍需目标机器构建和显示/输入真机验证 |
-| macOS | 已接入 dylib 构建/装配、网络权限、Foundation 存档路径和通用测试包脚本；待 macOS 构建机执行及真机测试 |
+| macOS | 已在 ARM64 macOS CI 生成双架构测试应用，验证 dylib/资源/签名/权限，静态分析及 9 项 Flutter 测试通过；Intel 真机和桌面人工体验待验证 |
 | Windows | Flutter 平台工程已生成；待原生库构建、资源打包、签名和测试 |
 | Android / iOS | Flutter 平台工程已生成；待移动端沙盒目录、静态/动态库集成、权限与生命周期适配 |
 
