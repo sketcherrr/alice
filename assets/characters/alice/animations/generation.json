@@ -1,0 +1,40 @@
+{
+  "tool": "built-in image_gen",
+  "date": "2026-11-17",
+  "reference": "../idle.png",
+  "transparent_background": true,
+  "assets": [
+    {
+      "file": "calm.png",
+      "columns": 4,
+      "rows": 2,
+      "row_states": [
+        "idle",
+        "listening"
+      ],
+      "prompt": "Use case: identity-preserve. Asset type: transparent 2D character animation sprite sheet for an app. Reference image is the exact Alice character identity: preserve her blue/periwinkle fluffy hair, blue eyes, whale-shaped hood, whale hairclip, navy/cream hoodie, bow, skirt, opaque socks, shoes and whale tail. Full-body cute chibi, clean anime linework and cel shading. Every cell contains exactly one COMPLETE character, same size, same camera, same baseline, consistent proportions. Center each character in its own equally sized cell with generous transparent padding; nothing crosses cell boundaries. Real transparent background, no scenery, floor, shadows, text, borders, grid lines, frame labels, extra characters or props unless specified. This is a temporal sprite animation sheet; frames progress left to right within each row. Keep her body position steady and do the motion primarily with arms, eyes, head and tail. Canvas aspect ratio 2:1. EXACTLY FOUR COLUMNS AND TWO ROWS, total 8 cells. Top row: 4-frame quiet idle breathing/blinking loop: relaxed hands near front, eyes open; soft half-blink; eyes gently closed; eyes open again. Bottom row: 4-frame attentive listening loop: hands gently together, head subtly tilts toward viewer, attentive open eyes; tiny nod; soft blink; return. Listening should be visually distinct from idle. No waving in these two rows."
+    },
+    {
+      "file": "social.png",
+      "columns": 4,
+      "rows": 2,
+      "row_states": [
+        "greeting",
+        "happy"
+      ],
+      "prompt": "Use case: identity-preserve. Asset type: transparent 2D character animation sprite sheet for an app. Reference image is the exact Alice character identity: preserve her blue/periwinkle fluffy hair, blue eyes, whale-shaped hood, whale hairclip, navy/cream hoodie, bow, skirt, opaque socks, shoes and whale tail. Full-body cute chibi, clean anime linework and cel shading. Every cell contains exactly one COMPLETE character, same size, same camera, same baseline, consistent proportions. Center each character in its own equally sized cell with generous transparent padding; nothing crosses cell boundaries. Real transparent background, no scenery, floor, shadows, text, borders, grid lines, frame labels, extra characters or props unless specified. This is a temporal sprite animation sheet; frames progress left to right within each row. Keep her body position steady and do the motion primarily with arms, eyes, head and tail. Canvas aspect ratio 2:1. EXACTLY FOUR COLUMNS AND TWO ROWS, total 8 cells. Top row: 4-frame greeting animation: one hand raised in a wave, hand leans left, hand leans right, hand returns center; friendly smile. Bottom row: 4-frame delighted happy animation: hands held up near cheeks, joyful closed-eye smile, small delighted arm lift, cheerful bounce pose, settle. Keep feet baseline almost identical and entire whale tail within each cell."
+    },
+    {
+      "file": "activities.png",
+      "columns": 4,
+      "rows": 3,
+      "row_states": [
+        "thinking",
+        "tea",
+        "sleeping"
+      ],
+      "prompt": "Use case: identity-preserve. Asset type: transparent 2D character animation sprite sheet for an app. Reference image is the exact Alice character identity: preserve her blue/periwinkle fluffy hair, blue eyes, whale-shaped hood, whale hairclip, navy/cream hoodie, bow, skirt, opaque socks, shoes and whale tail. Full-body cute chibi, clean anime linework and cel shading. Every cell contains exactly one COMPLETE character, same size, same camera, same baseline, consistent proportions. Center each character in its own equally sized cell with generous transparent padding; nothing crosses cell boundaries. Real transparent background, no scenery, floor, shadows, text, borders, grid lines, frame labels, extra characters or props unless specified. This is a temporal sprite animation sheet; frames progress left to right within each row. Keep her body position steady and do the motion primarily with arms, eyes, head and tail. Canvas aspect ratio 4:3. EXACTLY FOUR COLUMNS AND THREE ROWS, total 12 cells. Top row: 4-frame thinking loop: one hand at chin, eyes glance slightly upward, gentle blink, return. Middle row: 4-frame drinking-tea loop: holding a small cream mug with both hands at chest, raise mug toward mouth, sip with softly closed eyes, lower mug back to chest. Bottom row: 4-frame sleepy resting loop: curled up sitting with her own whale tail beside her, eyes closed, hands resting against cheek, slight sleepy head dip, breathe, return. Keep sitting character's bottom baseline same as standing rows; naturally shorter silhouette in this row. All props belong strictly inside their own cells."
+    }
+  ],
+  "rendering": "Original pixels and alpha preserved. Flutter draws equal grid rectangles at runtime. Timing is defined in character_animation.dart."
+}

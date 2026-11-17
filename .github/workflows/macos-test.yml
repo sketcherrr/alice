@@ -1,0 +1,88 @@
+name: macOS test app
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master, 'build/macos-test/**']
+    paths:
+      - 'apps/companion/**'
+      - 'crates/**'
+      - 'assets/**'
+      - 'scripts/**'
+      - 'Cargo.*'
+      - '.github/workflows/macos-test.yml'
+  pull_request:
+    paths:
+      - 'apps/companion/**'
+      - 'crates/**'
+      - 'assets/**'
+      - 'scripts/**'
+      - 'Cargo.*'
+      - '.github/workflows/macos-test.yml'
+permissions:
+  contents: read
+concurrency:
+  group: macos-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      FLUTTER_SUPPRESS_ANALYTICS: 'true'
+      FLUTTER_MACOS_ARM64_ONLY: 'false'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install verified Flutter 3.47.9
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$(uname -m)" in
+            arm64)
+              alice_archive=flutter_macos_arm64_3.47.9-stable.zip
+              alice_sha=6545b85938745dc5070e9faf2adf70233c1811009d87fe6d27bfcda5a04b7698
+              ;;
+            x86_64)
+              alice_archive=flutter_macos_3.47.9-stable.zip
+              alice_sha=0dc38b4038a0b002a6258696a5b327a58473c175c9e334b9f329ef7d79a4fdcd
+              ;;
+            *) exit 1 ;;
+          esac
+          curl -fL --retry 3 "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/$alice_archive" -o "$RUNNER_TEMP/flutter.zip"
+          printf '%s  %s\n' "$alice_sha" "$RUNNER_TEMP/flutter.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/flutter.zip" -d "$RUNNER_TEMP/alice-sdk"
+          rm "$RUNNER_TEMP/flutter.zip"
+          echo "$RUNNER_TEMP/alice-sdk/flutter/bin" >> "$GITHUB_PATH"
+      - name: Prepare Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v rustup >/dev/null; then
+            curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs -o "$RUNNER_TEMP/alice-rustup.sh"
+            sh "$RUNNER_TEMP/alice-rustup.sh" -y --profile minimal --default-toolchain stable
+          fi
+          export PATH="$HOME/.cargo/bin:$PATH"
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustc --version
+      - name: Build, verify and archive universal app
+        run: bash scripts/build-macos.sh
+      - name: Analyze and test on macOS
+        working-directory: apps/companion
+        env:
+          ALICE_CORE_LIBRARY: ${{ github.workspace }}/apps/companion/build/macos/Build/Products/Release/alice_companion.app/Contents/Frameworks/libalice_core.dylib
+        run: |
+          flutter analyze --no-pub
+          flutter test --no-pub
+      - name: Upload runnable app
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Alice-macOS-universal-test
+          path: |
+            dist/Alice-macOS-universal-test.zip
+            dist/Alice-macOS-universal-test.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

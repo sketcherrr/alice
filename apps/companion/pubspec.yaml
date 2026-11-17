@@ -1,0 +1,23 @@
+name: alice_companion
+description: Alice — a local-first character companion.
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.10.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/character.png
+    - assets/animations/
+    - assets/OFL.txt
+  fonts:
+    - family: Noto Sans CJK SC
+      fonts:
+        - asset: assets/NotoSansCJKsc-Regular.otf
+

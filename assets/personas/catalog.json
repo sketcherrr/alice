@@ -1,0 +1,25 @@
+{
+  "format_version": 1,
+  "locale": "zh-CN",
+  "shared_rules_file": "shared.json",
+  "selection": {
+    "initial_choice": "user_required",
+    "default_preset_id": null,
+    "preview_source": "card.preview",
+    "appearance_and_voice": "independent_of_personality"
+  },
+  "presets": [
+    {
+      "id": "gentle_resolute",
+      "file": "gentle_resolute.json"
+    },
+    {
+      "id": "clever_playful",
+      "file": "clever_playful.json"
+    },
+    {
+      "id": "reserved_attentive",
+      "file": "reserved_attentive.json"
+    }
+  ]
+}

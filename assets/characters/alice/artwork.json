@@ -1,0 +1,9 @@
+{
+  "id": "alice_whale",
+  "display_name": "Alice",
+  "tool": "built-in image_gen",
+  "prompt": "Use case: stylized-concept. Asset type: production character illustration for a 2D AI companion app, isolated transparent PNG. Design one original extremely cute whale-inspired anime girl, inspired by the approachable blue-and-white marine aesthetic of the DeepSeek whale-girl fandom. Make her an original character for Alice, without brand logos or text. Young adult character rendered in super-deformed 3-head-tall chibi proportions, large expressive sapphire eyes, softly rounded face, small friendly smile and rosy cheeks. Fluffy shoulder-length periwinkle-blue hair with lighter icy-blue tips, a tiny whale-fin-shaped hair clip and small curl on top. Cozy oversized navy-and-cream sailor hoodie, scalloped wave collar, pale blue bow, simple pleated skirt and opaque socks, rounded little shoes, fully clothed. A plump blue whale tail peeks out behind her with a cream underside. Standing full body, front three-quarter view facing viewer, one hand making a small welcoming wave, other relaxed near chest. Both feet, all hair and tail fully inside frame with generous transparent padding. Charming clean anime linework, delicate cel shading, soft pastel highlights, premium game character illustration, readable silhouette even at 200 pixels tall. Single character only, no other companion animals, no extra face studies, no panels, no written words, no watermark, no scenery, no floor or cast shadow. Genuinely transparent background, not a checkerboard illustration.",
+  "asset": "idle.png",
+  "transparent_background": true,
+  "notes": "原创鲸鱼主题角色立绘；三个性格预设共享同一形象。当前为单张立绘，界面使用轻微呼吸动画，不代表已完成逐帧动画。"
+}
