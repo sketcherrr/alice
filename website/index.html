@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f7f2">
+  <meta name="description" content="Alice · 小小鲸屿，一只住进日常的 AI 鲸鱼娘。三种性格、认真聊天、离线摸鱼。来岛上坐坐。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Alice · 小小鲸屿 — 今天也一起摸会儿鱼吧">
+  <meta property="og:description" content="能陪你认真聊，也能一起发呆。没网的时候，小日子照样过。">
+  <meta property="og:url" content="https://sketcherrr.github.io/alice/">
+  <meta property="og:image" content="https://sketcherrr.github.io/alice/assets/alice.png">
+  <link rel="canonical" href="https://sketcherrr.github.io/alice/">
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+  <title>Alice · 小小鲸屿 — 今天也一起摸会儿鱼吧</title>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="header wrap">
+    <a class="brand" href="#" aria-label="Alice 小小鲸屿，回到首页">
+      <img src="./favicon.svg" width="40" height="40" alt="">
+      <span>Alice<span class="brand-cn">小小鲸屿</span></span>
+    </a>
+    <nav aria-label="主导航">
+      <a href="#personality">认识一下</a>
+      <a href="#daily">相处日常</a>
+      <a class="nav-github" href="https://github.com/sketcherrr/alice" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="status-dot"></span> 桌面陪伴计划 · 正在慢慢长大</p>
+        <h1 id="hero-title">今天也辛苦了，<br>来摸会儿<span class="fish-word">鱼<svg viewBox="0 0 110 15" aria-hidden="true"><path d="M3 10 Q50 -1 106 7 M13 14 Q56 4 94 11"/></svg></span>吧。</h1>
+        <p class="hero-description">这是 Alice，一只住进日常的 AI 鲸鱼娘。<br class="desktop-break">能陪你认真聊，也能一起发呆。<br class="desktop-break">没网的时候，小日子照样过。</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#take-home">带她回家 <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="#personality">先认识一下 <span aria-hidden="true">↓</span></a>
+        </div>
+        <p class="hero-note"><span aria-hidden="true">✳</span> Mac 测试版已出炉，岛上欢迎第一批居民。</p>
+        <div class="little-note" aria-hidden="true">今日 KPI：开心一点点。<svg viewBox="0 0 86 43"><path d="M2 4 Q37 44 79 20 M65 18 L80 20 L75 34"/></svg></div>
+      </div>
+
+      <div class="hero-preview">
+        <div class="sticker sticker-top" aria-hidden="true">禁止内卷区 <span>✦</span></div>
+        <div class="pet-window" id="pet-window">
+          <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>alice's little island</span><span aria-hidden="true">✧</span></div>
+          <div class="pet-room">
+            <div class="room-heading"><span><span class="status-dot"></span> 小岛营业中</span><button class="motion-toggle" id="motion-toggle" type="button" aria-pressed="false" aria-label="暂停角色动画">Ⅱ</button></div>
+            <p class="pet-bubble" id="pet-bubble" aria-live="polite">你来啦。给你留了个位置。</p>
+            <span class="room-spark spark-one" aria-hidden="true">✧</span><span class="room-spark spark-two" aria-hidden="true">✦</span>
+            <span class="room-orbit" aria-hidden="true"></span>
+            <button class="pet-character" id="pet-character" type="button" aria-label="摸摸 Alice">
+              <img id="pet-fallback" src="./assets/alice.png" width="1133" height="1363" alt="穿着蓝白鲸鱼帽衫、正在向你挥手的 Alice">
+              <canvas id="pet-canvas" width="680" height="680" aria-hidden="true" hidden></canvas>
+            </button>
+            <span class="pet-shadow" aria-hidden="true"></span>
+            <p class="pet-caption" id="pet-caption">Alice · 陪你待一会儿</p>
+            <div class="pet-controls" aria-label="角色互动预览">
+              <button type="button" data-action="happy"><span aria-hidden="true">♡</span> 摸摸</button>
+              <button type="button" data-action="tea"><span aria-hidden="true">☕</span> 喝茶</button>
+              <button type="button" data-action="sleeping"><span aria-hidden="true">☾</span> 睡会儿</button>
+            </div>
+          </div>
+        </div>
+        <span class="sticker sticker-bottom" aria-hidden="true">摸鱼搭子，已就位。</span>
+        <p class="preview-note">↑ 可以戳戳她 · 网页台词为预设互动，正式聊天在客户端</p>
+        <noscript><p class="preview-note">开启 JavaScript 后，可以体验角色互动。</p></noscript>
+      </div>
+    </section>
+
+    <div class="island-strip" aria-label="小岛生活守则"><div class="wrap"><span>小岛生活守则</span><span>好好吃饭 <i>✳</i></span><span>允许发呆 <i>✳</i></span><span>拒绝精神内耗 <i>✳</i></span><span>摸鱼也算正经事</span></div></div>
+
+    <section class="personality-section section wrap" id="personality" aria-labelledby="personality-title">
+      <div class="section-heading"><div><p class="eyebrow">01 / 先混个脸熟</p><h2 id="personality-title">同一只鲸，<br>三种相处的节奏。</h2></div><p>你喜欢直球一点，还是慢慢熟悉？<br>选个合拍的开场。以后想换，也随时可以。</p></div>
+      <div class="personality-layout">
+        <div class="personality-options" role="group" aria-label="选择性格，查看示例台词">
+          <button class="persona active" type="button" data-persona="gentle" aria-pressed="true"><span class="persona-number">01</span><span><strong>温柔，但有主见</strong><small>会接住你的情绪，也会认真说出想法。</small></span><span class="persona-symbol" aria-hidden="true">☀</span></button>
+          <button class="persona" type="button" data-persona="playful" aria-pressed="false"><span class="persona-number">02</span><span><strong>聪明，略带俏皮</strong><small>接得住你的梗，偶尔还会反将一军。</small></span><span class="persona-symbol" aria-hidden="true">✷</span></button>
+          <button class="persona" type="button" data-persona="quiet" aria-pressed="false"><span class="persona-number">03</span><span><strong>慢热，细腻而克制</strong><small>话不一定很多，小事却放在心上。</small></span><span class="persona-symbol" aria-hidden="true">☾</span></button>
+        </div>
+        <div class="conversation-card">
+          <div class="conversation-top"><span>如果你说……</span><span class="tiny-tag">相处小剧场</span></div>
+          <p class="your-message">今天只想躺平。</p>
+          <div class="alice-message"><span class="avatar"><img src="./assets/alice.png" width="1133" height="1363" alt="" loading="lazy"></span><div><span class="message-name">Alice <span id="persona-tag">温柔，但有主见</span></span><p id="persona-reply" aria-live="polite">那就歇一会儿。不过晚饭得吃，我们先把外卖选了？</p></div></div>
+          <p class="conversation-foot">换的是相处方式，一起攒下的记忆还在。<span>示例台词，非实时 AI 回复</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="daily-section section" id="daily" aria-labelledby="daily-title"><div class="wrap">
+      <div class="section-heading"><div><p class="eyebrow">02 / 一起虚度一点时间</p><h2 id="daily-title">有话慢慢说。<br>没话，也能待着。</h2></div><p>赛博养鲸这件事，<br>可以很简单。</p></div>
+      <div class="daily-layout">
+        <div class="memory-note"><span class="tape" aria-hidden="true"></span><p class="note-label">小岛备忘录 <span aria-hidden="true">✧</span></p><h3>你说的小事，<br>不用每次从头讲。</h3><div class="memory-example"><span aria-hidden="true">♡</span><span>「比起咖啡，我更喜欢热茶。」<small>记忆示例 · 确认后才会留下</small></span></div><p>想让她记住的，就留下。<br>不想再提的，也可以删掉。<br>这本小本子，由你做主。</p><span class="note-doodle" aria-hidden="true">记住啦 ✓</span></div>
+        <div class="daily-list">
+          <article><span class="daily-index">01</span><div><h3>聊正经的，也聊有的没的。</h3><p>接上自己的 OpenAI API Key，就能和她聊聊今天。角色人设、最近的对话和相关记忆，会一起带进聊天里。</p><span class="small-label">文字聊天 · 需要联网与自己的 Key</span></div></article>
+          <article><span class="daily-index">02</span><div><h3>网断了？问题不大。</h3><p>摸摸、喝茶、休息、找珍珠。离线时还有本地的小日常，有一点小时候养电子宠物的意思。</p><span class="small-label">离线互动 · 不消耗 API</span></div></article>
+          <article><span class="daily-index">03</span><div><h3>今天的表情，也有认真营业。</h3><p>挥手、眨眼、侧耳听、想事情，再到捧着杯子吨吨吨。七种动画，让小小的窗口热闹一点。</p><span class="small-label">7 组动画 · 简洁的单角色界面</span></div></article>
+        </div>
+      </div>
+    </div></section>
+
+    <section class="take-home section wrap" id="take-home" aria-labelledby="take-home-title">
+      <div class="download-card"><div class="download-copy"><p class="eyebrow">03 / 岛上见</p><h2 id="take-home-title">桌面空出一角，<br>给 Alice 留个位置。</h2><p>第一版还小，偶尔可能犯点迷糊。<br>欢迎来试玩，顺便一起把小岛养大。</p><a class="button button-primary" id="mac-download" href="https://github.com/sketcherrr/alice/actions/workflows/macos-test.yml" target="_blank" rel="noopener noreferrer">领取 Mac 测试版 <span aria-hidden="true">↗</span></a><span class="download-meta">Apple Silicon + Intel · 无需开发环境</span><p class="download-help">在最近一次成功构建的 Artifacts 中下载，需登录 GitHub。<br>解压里面的应用 ZIP，把 Alice.app 拖进“应用程序”就好。</p></div><div class="download-art" aria-hidden="true"><span class="postmark">小小鲸屿<br><strong>WELCOME</strong></span><img src="./assets/alice.png" width="1133" height="1363" alt="" loading="lazy"><span class="download-sticker">行李收好啦！</span></div></div>
+      <div class="platforms" aria-label="各平台开发状态"><div><span class="platform-icon" aria-hidden="true">⌘</span><strong>macOS</strong><span class="platform-status available">测试包已就位</span></div><div><span class="platform-icon" aria-hidden="true">&gt;_</span><strong>Linux</strong><a href="https://github.com/sketcherrr/alice#在-linux-上启动" target="_blank" rel="noopener noreferrer">原型可自行构建 ↗</a></div><div><span class="platform-icon" aria-hidden="true">⊞</span><strong>Windows</strong><span class="platform-status">还在施工</span></div><div><span class="platform-icon" aria-hidden="true">▯</span><strong>手机 / 树莓派</strong><span class="platform-status">在计划里啦</span></div></div>
+      <p class="release-note">Mac 测试版尚未经过 Apple 公证。首次打开若被拦住，可在“系统设置 → 隐私与安全性”允许打开。<a href="https://github.com/sketcherrr/alice/blob/main/docs/macos-testing.md" target="_blank" rel="noopener noreferrer">详细说明 ↗</a></p>
+    </section>
+
+    <section class="faq-section section wrap" aria-labelledby="faq-title"><div class="faq-heading"><p class="eyebrow">登岛前的小问号</p><h2 id="faq-title">你可能还想问。</h2><p>有一说一，都写在这里。</p></div><div class="faq-list">
+      <details><summary>需要一直联网吗？<span aria-hidden="true">+</span></summary><p>不需要。聊天需要网络和自己的 OpenAI API Key；摸摸、喝茶、休息和找珍珠小游戏可以离线玩。网页上的互动只是小预览，真正的养成和聊天在客户端里。</p></details>
+      <details><summary>聊天要花钱吗？<span aria-hidden="true">+</span></summary><p>OpenAI API 的调用费用由你自己的账号承担。Alice 不附带 API 额度，也不会在后台偷偷替你聊天。可以先不填 Key，试试离线的小日常。</p></details>
+      <details><summary>她会记住什么？存在哪里？<span aria-hidden="true">+</span></summary><p>性格、状态、聊天和已确认的长期记忆保存在本机。模型提出的新记忆需要你确认，也可以随时查看或删除。联网聊天时，会发送相关记忆和近期对话给 OpenAI。当前没有云同步，Key 只在本次运行中保留，关闭后需重填。</p></details>
+      <details><summary>语音、看屏幕、手机端……安排吗？<span aria-hidden="true">+</span></summary><p>安排在后续计划里，目前还不能用。现在先把文字聊天、记忆和桌面互动做好，再慢慢扩展语音、视觉、手机小屋和带屏幕的树莓派。透明桌面悬浮也还在施工。</p></details>
+      <details><summary>发现 bug，或者有个好点子？<span aria-hidden="true">+</span></summary><p>欢迎来 <a href="https://github.com/sketcherrr/alice/issues" target="_blank" rel="noopener noreferrer">GitHub Issues</a> 留张小纸条。带上系统版本、操作步骤和报错会更好找原因；记得把 Key 和私人聊天内容遮掉。</p></details>
+    </div></section>
+  </main>
+
+  <footer class="footer"><div class="wrap"><div><a class="brand" href="#"><img src="./favicon.svg" width="36" height="36" alt=""><span>Alice<span class="brand-cn">小小鲸屿</span></span></a><p>世界很大，先照顾好这一小块。</p></div><div class="footer-right"><a href="https://github.com/sketcherrr/alice" target="_blank" rel="noopener noreferrer">去 GitHub 串个门 ↗</a><span>Made with care, and a little bit of 摸鱼。</span><span>by sketcherrr · 2026</span></div></div></footer>
+</body>
+</html>
