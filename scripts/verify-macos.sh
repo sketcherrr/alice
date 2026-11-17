@@ -11,7 +11,7 @@ for alice_binary in "$alice_app/Contents/MacOS/$alice_executable" "$alice_core" 
   "$alice_app/Contents/Frameworks/FlutterMacOS.framework/FlutterMacOS" \
   "$alice_app/Contents/Frameworks/App.framework/App"; do
   [[ -f "$alice_binary" ]] || { echo "Missing binary: $alice_binary" >&2; exit 1; }
-  xcrun lipo -verify_arch arm64 x86_64 "$alice_binary"
+  xcrun lipo "$alice_binary" -verify_arch arm64 x86_64
 done
 for alice_symbol in alice_call alice_free alice_alloc alice_dealloc; do
   # nm's external, defined symbols must include the entire FFI boundary in both slices.
