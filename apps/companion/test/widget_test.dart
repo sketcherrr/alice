@@ -30,6 +30,21 @@ class DemoCore implements CompanionCore {
   }
 }
 
+// The pet ticker intentionally never settles. Advance route animations until
+// the actual pointer target is available instead of waiting for all animations.
+Future<void> tapReady(WidgetTester tester, Finder finder) async {
+  await tester.pump();
+  for (var frame = 0; frame < 30; frame++) {
+    if (finder.hitTestable().evaluate().length == 1) {
+      await tester.tap(finder);
+      await tester.pump();
+      return;
+    }
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+  fail('Control did not become visible and hit-testable: $finder');
+}
+
 void main() {
   for (final width in [390.0, 480.0, 1280.0]) {
     testWidgets(
@@ -44,23 +59,22 @@ void main() {
         await tester.pump(const Duration(milliseconds: 400));
         expect(find.byType(PetCharacter), findsOneWidget);
         expect(find.byType(TextField), findsNothing);
-        await tester.tap(find.text('选择她的性格'));
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.tap(find.byKey(const ValueKey('gentle_resolute')));
-        await tester.pump(const Duration(milliseconds: 400));
-        await tester.tap(find.byTooltip('摸摸'));
+        await tapReady(tester, find.text('选择她的性格'));
+        await tapReady(tester, find.byKey(const ValueKey('gentle_resolute')));
+        expect(core.state['persona'], 'gentle_resolute');
+        await tapReady(tester, find.byTooltip('摸摸'));
         await tester.pump();
         expect(
           tester.widget<PetCharacter>(find.byType(PetCharacter)).motion,
           PetMotion.happy,
         );
-        await tester.tap(find.byTooltip('休息'));
+        await tapReady(tester, find.byTooltip('休息'));
         await tester.pump(const Duration(milliseconds: 100));
         expect(
           tester.widget<PetCharacter>(find.byType(PetCharacter)).motion,
           PetMotion.sleeping,
         );
-        await tester.tap(find.byTooltip('醒来'));
+        await tapReady(tester, find.byTooltip('醒来'));
         await tester.pump();
         expect(
           tester.widget<PetCharacter>(find.byType(PetCharacter)).motion,
