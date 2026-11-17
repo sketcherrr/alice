@@ -26,6 +26,11 @@ try:
             page.goto(url, wait_until='networkidle')
             expect(page.locator('#pet-canvas')).to_be_visible()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow at {width}px'
+            assert page.evaluate('''() => {
+                const a = document.querySelector('.sticker-bottom').getBoundingClientRect();
+                const b = document.querySelector('.pet-controls').getBoundingClientRect();
+                return a.bottom <= b.top || a.top >= b.bottom || a.right <= b.left || a.left >= b.right;
+            }'''), f'Decorative sticker covers interactive controls at {width}px'
             assert page.locator('h1').count() == 1
             if width in (1440, 390):
                 page.screenshot(path=str(SCREENSHOTS / f'alice-{width}.png'), full_page=True)

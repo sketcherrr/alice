@@ -2,6 +2,8 @@
 
 一个本地优先的角色伙伴原型：以单一角色为中心的简洁陪伴窗口，三种可选性格、离线互动、长期记忆与 OpenAI Agent 文字对话。
 
+**[去小小鲸屿坐坐 →](https://sketcherrr.github.io/alice/)** · 项目介绍、角色互动预览与下载入口。网页源码位于 [website/](website/README.md)，由 GitHub Pages 自动发布。
+
 当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、9 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
 
 ## 现在可以做什么
