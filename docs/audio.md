@@ -39,7 +39,7 @@
 
 播放使用 `audioplayers 6.8.1`，录音使用 `record 7.2.0`。macOS/iOS 已增加麦克风用途描述，macOS Sandbox 已启用 `audio-input`，Android 已加入录音和联网权限。音频插件支持原有目标平台；移动端与树莓派整体应用仍需原生核心分发与真机验证。
 
-Linux 播放需要 GStreamer（开发构建还需要 `gstreamer-1.0`、`gstreamer-app-1.0`、`gstreamer-audio-1.0` 的开发文件）；录音插件需要 `parecord`、`pactl` 和 `ffmpeg`。系统还需要可用的声音服务和输入/输出设备。[录音插件说明](https://pub.dev/packages/record)
+Linux 播放需要 GStreamer 与 MP3 解码插件（开发构建还需要 `gstreamer-1.0`、`gstreamer-app-1.0`、`gstreamer-audio-1.0` 的开发文件）；录音插件需要 `parecord`、`pactl` 和 `ffmpeg`。系统还需要可用的声音服务和输入/输出设备。[录音插件说明](https://pub.dev/packages/record)
 
 离线协议检查：
 

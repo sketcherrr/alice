@@ -86,3 +86,21 @@ dart scripts/check-agent.dart
 [最终 macOS CI](https://github.com/sketcherrr/alice/actions/runs/44455053204)（源码 `e51da0c3b8b9ae40fee26cd1cf4421c52b32cd93`）通过全部 13 项 Flutter 测试与 8 项 Rust 测试；实际打包 dylib 的离线协议和 Agent 检查通过。四个二进制均有 arm64/x86_64 切片，签名、沙盒、联网权限与新旧动画资源验证通过。
 
 已取回 0.2.0（build 2）应用 ZIP，41,616,983 字节。附件摘要、应用 SHA-256、CRC、双架构、framework 符号链接和 3 张新版图集与源素材一致性均已核对。应用 ZIP SHA-256：`8dd5e9451065951851587c10522e7171e57aac9d925125fc4ac3218a1ae53b8b`。下载见 [macOS 测试说明](macos-testing.md)。Mac/Windows 桌面显示、拖拽与多屏体验仍需真机人工测试。
+
+
+## Lo-fi 与按住说话 · 2026-11-19
+
+- 两首原创 MP3 的解码格式已核对：32kHz 立体声，长度约 50.5 秒与 56.5 秒；源脚本和 CC0 说明随源码提供。
+- 独立语音协议检查通过：multipart 文件转写、Bearer 认证、重定向阻止、错误脱敏、Realtime 事件顺序、PCM/WAV 转换、连接取消与超时、不播放未完成音频。
+- Linux 含播放/录音插件的 release 构建通过。新增声音面板经过实际 Flutter 引擎渲染检查，截图在 `artifacts/audio-v3/sound-panel.png`。
+- 本机无界面渲染使用 Flutter patched kernel 编译器和 release 资源目录，避开受限环境下 Dart CLI 无法写入分析配置目录的问题；未修改 SDK 或应用代码来跳过检查。
+- 没有真实 OpenAI Key，不进行收费请求；未在麦克风和扬声器上做真实录音/听音测试，实际中文音色、系统权限弹窗、回声与设备切换仍需真机验证。
+
+完整的语音界面回归另在无界面引擎运行：模拟录音 → 转写 → 现有 Agent → 语音播放通过；录音结束文件迟到时切换应用不会继续上传。音乐、语音硬件和远端 API 在该检查中使用模拟实现。
+
+
+[最终 macOS CI](https://github.com/sketcherrr/alice/actions/runs/44459600513) 对应源码 `1e06620f965fbf385d141b73e7832ceb649eeaa9`：22 项 Flutter 测试与 8 项 Rust 测试全部通过，实际 dylib 的离线协议与 Agent 检查通过。[Windows 编译](https://github.com/sketcherrr/alice/actions/runs/44459600588) 通过。完整语音界面测试等待原生窗口调整及设置弹窗输入框实际可交互后执行，没有跳过功能检查。
+
+已取回 0.3.0（build 3）Mac 应用 ZIP，44,205,485 字节。附件与应用摘要、CRC、麦克风用途声明、两首音乐与源素材逐字节一致性、framework 符号链接均已核对。主程序、Flutter 引擎、Dart AOT、Rust 核心、objective_c 运行库共 5 个 Mach-O 二进制全部包含 arm64 与 x86_64。签名、Sandbox 出站联网和 audio-input 权限在 macOS CI 校验通过。
+
+应用 ZIP SHA-256：`465ba33026febba4fad308d0e7ac7b7f2c4749733c3ce08001f3168abe26a67d`。本机副本为 `dist/Alice-macOS-universal-test.zip`，下载见 [macOS 测试说明](macos-testing.md)。
