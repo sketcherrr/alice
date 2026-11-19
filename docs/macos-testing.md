@@ -1,19 +1,19 @@
 # macOS 测试版构建
 
-已交付可直接运行的 `Alice.app`，测试者不需要安装 Xcode、Flutter 或 Rust。
+已交付 0.2.0 可直接运行的 `Alice.app`（透明桌宠、新动画与三种小游戏），测试者不需要安装 Xcode、Flutter 或 Rust。
 
 ## 当前状态
 
-- 2026-11-17 在 GitHub macOS 15 / ARM64 构建机成功生成 Apple Silicon + Intel 通用应用；[构建与测试记录](https://github.com/sketcherrr/alice/actions/runs/44062425991)。
-- 应用对应源码提交 `d92649a29aee89c23eac1c67927e8a12163b86ee`，使用 Flutter 3.47.9、Xcode 16.4 和 Rust 1.100.0。
-- 已验证双架构、嵌套签名、字体/动画、FFI 导出、沙盒及出站联网权限；静态分析无问题，9 项 Flutter 测试通过，实际 Rust/SQLite 与模拟 OpenAI Agent 检查通过。
+- 2026-11-19 在 GitHub macOS 15 / ARM64 构建机成功生成 Apple Silicon + Intel 通用应用；[构建与测试记录](https://github.com/sketcherrr/alice/actions/runs/44455053204)。
+- 应用对应源码提交 `e51da0c3b8b9ae40fee26cd1cf4421c52b32cd93`，使用 Flutter 3.47.9、Xcode 16.4 和 Rust 1.100.0。
+- 已验证双架构、嵌套签名、字体/动画、FFI 导出、沙盒及出站联网权限；静态分析无问题，13 项 Flutter 测试通过，实际 Rust/SQLite 与模拟 OpenAI Agent 检查通过。
 - 已下载并再次核对附件哈希、应用压缩包完整性、四个二进制的架构切片与 framework 符号链接。桌面人工体验、Intel 真机与最低系统版本仍待测试；未调用真实 OpenAI API。
-- [下载测试附件](https://github.com/sketcherrr/alice/actions/runs/44062425991/artifacts/14318149867)，需登录 GitHub，保留至 2026-12-01。附件内包含应用压缩包及 SHA-256 文件；本地副本位于 `dist/`。
+- [下载测试附件](https://github.com/sketcherrr/alice/actions/runs/44455053204/artifacts/14497940287)，需登录 GitHub，保留至 2026-12-03。附件内包含应用压缩包及 SHA-256 文件；本地副本位于 `dist/`。
 
 `Alice-macOS-universal-test.zip` 的 SHA-256：
 
 ```text
-45127b3707c178036c4870368aba5f54105873debe571379e16e185250a1c1cd
+8dd5e9451065951851587c10522e7171e57aac9d925125fc4ac3218a1ae53b8b
 ```
 
 旧的 `dist/Alice-macOS-build-input.zip` 只是源码与素材输入，不能作为应用安装。
@@ -50,11 +50,11 @@
 
 ## 测试者拿到应用后
 
-从 GitHub 下载时先解压附件，再解压其中的 `Alice-macOS-universal-test.zip`；使用本地 `dist/` 中的同名应用压缩包时只需解压一次。将完整 `Alice.app` 拖到“应用程序”后打开。在右上角「…」→「连接 OpenAI」配置自己的 OpenAI Key 和模型 ID；Key 不随构建包提供。
+从 GitHub 下载时先解压附件，再解压其中的 `Alice-macOS-universal-test.zip`；使用本地 `dist/` 中的同名应用压缩包时只需解压一次。将完整 `Alice.app` 拖到“应用程序”后打开。右键人物打开抽屉，在「连接 OpenAI」中配置自己的 OpenAI Key 和模型 ID；Key 不随构建包提供。
 
 这是临时签名的内部测试版，尚未使用 Developer ID 签名或经 Apple 公证。macOS 可能要求在“系统设置 → 隐私与安全性”中确认允许打开。正式公开发布前需单独完成签名、公证和安装分发验证，不通过脚本修改系统安全设置。
 
-建议测试初次选择性格、摸摸/喝茶/休息动画、关闭后重开存档、API 聊天、取消请求、确认/删除记忆，以及屏幕缩放和窗口调整。
+建议测试透明桌面背景、拖动/双击/右键人物、操作条自动收起、初次选择性格、八种动画、三种小游戏与最高分、切换应用时暂停、关闭后重开存档、API 聊天、取消请求、确认/删除记忆，以及多屏和显示缩放。
 
 存档通过 Foundation 的 Application Support 定位，在 App Sandbox 的容器内创建 Alice 目录；不写入 `.app` 内。Finder 启动不依赖终端的当前目录。
 

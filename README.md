@@ -4,7 +4,7 @@
 
 **[去小小鲸屿坐坐 →](https://sketcherrr.github.io/alice/)** · 项目介绍、角色互动预览与下载入口。网页源码位于 [website/](website/README.md)，由 GitHub Pages 自动发布。
 
-当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、9 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
+当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、13 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
 
 ## 现在可以做什么
 
@@ -39,7 +39,7 @@
 
 ## 后续填写 API Key
 
-打开右上角「…」→「连接 OpenAI」，填写自己的 API Key 和账号可用的模型 ID。密钥仅保留在本次应用进程内，不写入 SQLite，不写入日志。关闭应用后需要重新填写。
+右键人物打开抽屉，或将鼠标停在人物上再点「…」→「连接 OpenAI」，填写自己的 API Key 和账号可用的模型 ID。密钥仅保留在本次应用进程内，不写入 SQLite，不写入日志。关闭应用后需要重新填写。
 
 也支持从启动环境读取 `OPENAI_API_KEY` 与 `OPENAI_MODEL`，本项目不会自动读取 `.env` 文件。不要把密钥写进代码、截图或版本库。默认不内置模型 ID，避免将某个账号无权使用或已下线的型号固定在产品里。
 
@@ -84,7 +84,7 @@ dart scripts/check-agent.dart
 
 - 原始角色：`assets/characters/alice/idle.png`，透明 PNG。
 - 使用内置 `image_gen` 生图，完整提示词与生成方式保存在 `assets/characters/alice/artwork.json`。
-- 以鲸鱼娘的蓝白海洋视觉为参考设计原创角色，没有品牌文字。逐帧动画源文件位于 `assets/characters/alice/animations/`，完整动画提示词保存在该目录的 `generation.json`。原始立绘保留作为加载失败时的后备。
+- 以鲸鱼娘的蓝白海洋视觉为参考设计原创角色，没有品牌文字。逐帧动画源文件位于 `assets/characters/alice/animations/`，完整动画提示词保存在该目录的 `generation.json` 与 `generation-v2.json`。原始立绘保留作为加载失败时的后备。
 - 字体为 Noto Sans CJK SC，附带 `assets/fonts/OFL.txt`。独立字面从本机 Noto CJK 字体集合提取，字形未修改。
 - `scripts/prepare-assets.py` 将源资源复制到 Flutter 资源目录，不改变图片透明度。
 
@@ -96,7 +96,7 @@ dart scripts/check-agent.dart
 
 已生成包含 Apple Silicon 和 Intel 架构的 `Alice.app`，测试者无需开发环境。
 
-[下载 macOS 测试包](https://github.com/sketcherrr/alice/actions/runs/44062425991/artifacts/14318149867)（需登录 GitHub，附件保留至 2026-12-01）。解压下载附件，再解压其中的 `Alice-macOS-universal-test.zip`，将 `Alice.app` 拖入“应用程序”。本地已取回同名应用压缩包，位于 `dist/`。
+[下载 macOS 测试包](https://github.com/sketcherrr/alice/actions/runs/44455053204/artifacts/14497940287)（需登录 GitHub，附件保留至 2026-12-03）。解压下载附件，再解压其中的 `Alice-macOS-universal-test.zip`，将 `Alice.app` 拖入“应用程序”。本地已取回同名应用压缩包，位于 `dist/`。
 
 测试版使用临时签名，尚未通过 Apple 公证；首次打开被系统阻止时，可前往“系统设置 → 隐私与安全性”允许打开。构建脚本为 `scripts/build-macos.sh`，自动构建流程为 `.github/workflows/macos-test.yml`；后续相关代码提交会自动生成新测试包。
 

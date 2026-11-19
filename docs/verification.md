@@ -62,3 +62,27 @@ dart scripts/check-agent.dart
 已修复打包校验脚本的 `lipo` 参数顺序；界面测试改为等到控件可以被点击后操作，避免持续动画与底部面板过渡导致误点。没有跳过失败检查。
 
 应用 ZIP 的 SHA-256 为 `45127b3707c178036c4870368aba5f54105873debe571379e16e185250a1c1cd`。下载与首次打开步骤见 [macOS 测试说明](macos-testing.md)。
+
+
+## 透明桌宠与小游戏 · 2026-11-19
+
+本轮新增原生透明桌面窗口、8 种动作（56 帧）和俄罗斯方块、打砖块，保留找珍珠。
+
+| 项目 | 结果 |
+|---|---|
+| Rust 核心 | 8 项测试通过，包含成绩持久化、无效参数回滚及重复局 ID 不重复计次 |
+| 规则引擎 | 独立 Dart 检查通过：七袋随机、旋转/消行/暂存/结束，挡板/砖块碰撞、三关与生命、暂停和帧率差异 |
+| Dart 静态分析 | 无问题 |
+| Linux release | GTK 原生透明窗口与 Flutter 界面编译通过，已更新随包 Rust 核心 |
+| Windows release 编译 | [Windows CI](https://github.com/sketcherrr/alice/actions/runs/44455053215) 通过，包含 DWM/MethodChannel 原生代码；未交付带 Rust/SQLite 的 Windows 发行包 |
+| 实际 Flutter 渲染 | 透明区域 alpha=0，角色存在；两种新游戏能打开、操作、暂停、关闭，无布局错误 |
+| 渲染截图 | `artifacts/desktop-v2/transparent-desktop.png`、`tetris.png`、`breakout.png` |
+
+本地引擎检查不能替代操作系统桌面人工体验；逐像素鼠标穿透未实现，Linux 透明显示取决于合成器。未执行真实 OpenAI 请求。
+
+界面检查曾发现关闭面板后仍残留 220ms 窗口缩放任务；现改为可取消计时器，在新面板打开及界面销毁时取消，并加入销毁过程的回归检查。
+
+
+[最终 macOS CI](https://github.com/sketcherrr/alice/actions/runs/44455053204)（源码 `e51da0c3b8b9ae40fee26cd1cf4421c52b32cd93`）通过全部 13 项 Flutter 测试与 8 项 Rust 测试；实际打包 dylib 的离线协议和 Agent 检查通过。四个二进制均有 arm64/x86_64 切片，签名、沙盒、联网权限与新旧动画资源验证通过。
+
+已取回 0.2.0（build 2）应用 ZIP，41,616,983 字节。附件摘要、应用 SHA-256、CRC、双架构、framework 符号链接和 3 张新版图集与源素材一致性均已核对。应用 ZIP SHA-256：`8dd5e9451065951851587c10522e7171e57aac9d925125fc4ac3218a1ae53b8b`。下载见 [macOS 测试说明](macos-testing.md)。Mac/Windows 桌面显示、拖拽与多屏体验仍需真机人工测试。
