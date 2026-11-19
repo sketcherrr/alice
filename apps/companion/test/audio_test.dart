@@ -11,6 +11,7 @@ import 'package:alice_companion/openai.dart';
 import 'package:alice_companion/main.dart';
 import 'package:alice_companion/agent.dart';
 import 'package:alice_companion/core.dart';
+import 'package:alice_companion/desktop_pet.dart';
 import 'widget_test.dart' show DemoCore, tapReady;
 import '../../../scripts/check-voice.dart' as protocol;
 
@@ -149,6 +150,16 @@ void main() {
   testWidgets(
     'hold-to-talk goes through transcription, existing agent and spoken reply',
     (tester) async {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        DesktopHost.channel,
+        (_) async => null,
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          DesktopHost.channel,
+          null,
+        ),
+      );
       final device = FakeAudioDevice(), api = RoundTripVoice();
       final audio = CompanionAudio(device: device, api: api);
       final core = DemoCore();
@@ -170,8 +181,22 @@ void main() {
       await mouse.moveTo(tester.getCenter(find.byKey(const ValueKey('pet'))));
       await tester.pump(const Duration(milliseconds: 300));
       // No key: the explicit recording action opens connection settings.
-      await tester.tap(find.byKey(const ValueKey('hold-to-speak')));
-      await tester.pump(const Duration(milliseconds: 400));
+      await tapReady(tester, find.byKey(const ValueKey('hold-to-speak')));
+      // Native window expansion resolves asynchronously before Navigator mounts
+      // the dialog. Wait for its actual input rather than an arbitrary frame.
+      for (var frame = 0; frame < 30; frame++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (find
+            .byKey(const ValueKey('api-key'))
+            .hitTestable()
+            .evaluate()
+            .isNotEmpty)
+          break;
+      }
+      expect(
+        find.byKey(const ValueKey('api-key')).hitTestable(),
+        findsOneWidget,
+      );
       await tester.enterText(
         find.byKey(const ValueKey('api-key')),
         'test-only',
