@@ -29,6 +29,36 @@ impl Drop for Save {
 }
 
 #[test]
+fn arcade_scores_survive_restart_and_duplicate_results_are_idempotent() {
+    let save = Save::new();
+    save.select();
+    let result = json!({"op":"arcade_result","game":"tetris","run_id":"first-run","score":1200});
+    let first = save.call(result.clone(), 1000)["state"].clone();
+    let duplicate = save.call(result, 1000)["state"].clone();
+    assert_eq!(first, duplicate);
+    save.call(
+        json!({"op":"arcade_result","game":"tetris","run_id":"second-run","score":800}),
+        1000,
+    );
+    let state = save.call(json!({"op":"snapshot"}), 1000)["state"].clone();
+    assert_eq!(state["arcade"]["tetris"]["best"], 1200);
+    assert_eq!(state["arcade"]["tetris"]["plays"], 2);
+    assert!(execute(
+        &save.0,
+        json!({"op":"arcade_result","game":"tetris","run_id":"bad","score":-2}),
+        1000
+    )
+    .is_err());
+    assert!(execute(
+        &save.0,
+        json!({"op":"arcade_result","game":"unknown","run_id":"bad","score":0}),
+        1000
+    )
+    .is_err());
+    assert_eq!(state, save.call(json!({"op":"snapshot"}), 1000)["state"]);
+}
+
+#[test]
 fn selection_is_explicit_and_save_survives_reopening() {
     let save = Save::new();
     let fresh = save.call(json!({"op":"snapshot"}), 1000);

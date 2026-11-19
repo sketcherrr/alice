@@ -6,8 +6,14 @@ import 'agent.dart';
 import 'character_animation.dart';
 import 'core.dart';
 import 'openai.dart';
+import 'desktop_pet.dart';
+import 'arcade.dart';
 
-void main() => runApp(const AliceApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(AliceApp(desktop: DesktopHost.supported));
+}
+
 const ink = Color(0xFF494B68),
     muted = Color(0xFF8A8CA4),
     accent = Color(0xFF7B83B6);
@@ -16,14 +22,16 @@ const paper = Color(0xFFFCFAF8);
 class AliceApp extends StatelessWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
-  const AliceApp({super.key, this.core, this.agent});
+  final bool desktop;
+  const AliceApp({super.key, this.core, this.agent, this.desktop = false});
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Alice · 小小鲸屿',
+    color: Colors.transparent,
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: paper,
+      scaffoldBackgroundColor: desktop ? Colors.transparent : paper,
       colorScheme: ColorScheme.fromSeed(seedColor: accent, surface: paper),
       fontFamily: 'Noto Sans CJK SC',
       textTheme: ThemeData.light().textTheme.apply(
@@ -48,14 +56,15 @@ class AliceApp extends StatelessWidget {
         ),
       ),
     ),
-    home: CompanionHome(core: core, agent: agent),
+    home: CompanionHome(core: core, agent: agent, desktop: desktop),
   );
 }
 
 class CompanionHome extends StatefulWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
-  const CompanionHome({super.key, this.core, this.agent});
+  final bool desktop;
+  const CompanionHome({super.key, this.core, this.agent, this.desktop = false});
   @override
   State<CompanionHome> createState() => _CompanionHomeState();
 }
@@ -67,7 +76,9 @@ class _CompanionHomeState extends State<CompanionHome>
   List<dynamic> profiles = [];
   String? startupError, localLine;
   String progress = '';
-  bool busy = false, chatOpen = false;
+  bool busy = false, chatOpen = false, onTop = true;
+  int panels = 0;
+  Timer? idleTimer;
   String keyValue = Platform.environment['OPENAI_API_KEY'] ?? '';
   String model = Platform.environment['OPENAI_MODEL'] ?? '';
   final input = TextEditingController(), memoryInput = TextEditingController();
@@ -92,6 +103,14 @@ class _CompanionHomeState extends State<CompanionHome>
     WidgetsBinding.instance.addObserver(this);
     inputFocus.addListener(() => motion.listen(inputFocus.hasFocus));
     _open();
+    idleTimer = Timer.periodic(const Duration(seconds: 55), (_) {
+      if (mounted &&
+          !busy &&
+          !chatOpen &&
+          panels == 0 &&
+          motion.motion == PetMotion.idle)
+        motion.play(PetMotion.stretching, duration: const Duration(seconds: 6));
+    });
   }
 
   @override
@@ -104,6 +123,7 @@ class _CompanionHomeState extends State<CompanionHome>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     cancellation?.cancel();
+    idleTimer?.cancel();
     motion.dispose();
     inputFocus.dispose();
     input.dispose();
@@ -214,6 +234,7 @@ class _CompanionHomeState extends State<CompanionHome>
     motion.sleep(false);
     localLine = '嗯，我在。今天想和我聊些什么？';
     chatOpen = true;
+    if (widget.desktop) DesktopHost.expanded(true);
     _refresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) inputFocus.requestFocus();
@@ -269,66 +290,142 @@ class _CompanionHomeState extends State<CompanionHome>
     }
   }
 
+  Future<void> _enterPanel() async {
+    panels++;
+    if (widget.desktop) await DesktopHost.expanded(true);
+  }
+
+  Future<void> _leavePanel() async {
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    panels = math.max(0, panels - 1);
+    if (mounted && widget.desktop && panels == 0 && !chatOpen)
+      await DesktopHost.expanded(false);
+  }
+
   Future<void> _panel(
     String title,
     Widget Function(BuildContext) content,
   ) async {
     inputFocus.unfocus();
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: paper,
-      constraints: const BoxConstraints(maxWidth: 520),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            0,
-            24,
-            20 + MediaQuery.viewInsetsOf(ctx).bottom,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: math.max(
-                120,
-                MediaQuery.sizeOf(ctx).height * .78 -
-                    MediaQuery.viewInsetsOf(ctx).bottom,
-              ),
+    await _enterPanel();
+    if (!mounted) return;
+    Widget body(BuildContext ctx) => SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          24,
+          12,
+          24,
+          20 + MediaQuery.viewInsetsOf(ctx).bottom,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: math.max(
+              120,
+              MediaQuery.sizeOf(ctx).height * .8 -
+                  MediaQuery.viewInsetsOf(ctx).bottom,
             ),
-            child: ValueListenableBuilder<int>(
-              valueListenable: changes,
-              builder: (_, value, child) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
+          ),
+          child: ValueListenableBuilder<int>(
+            valueListenable: changes,
+            builder: (_, value, child) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      IconButton(
-                        key: const ValueKey('close-panel'),
-                        tooltip: '关闭',
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Flexible(child: SingleChildScrollView(child: content(ctx))),
-                ],
-              ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('close-panel'),
+                      tooltip: '关闭',
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Flexible(child: SingleChildScrollView(child: content(ctx))),
+              ],
             ),
           ),
         ),
       ),
     );
+    try {
+      if (widget.desktop) {
+        await showDialog<void>(
+          context: context,
+          barrierColor: Colors.transparent,
+          builder: (ctx) => Dialog(
+            backgroundColor: paper,
+            insetPadding: const EdgeInsets.all(12),
+            child: SizedBox(width: 480, child: body(ctx)),
+          ),
+        );
+      } else {
+        await showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          backgroundColor: paper,
+          constraints: const BoxConstraints(maxWidth: 520),
+          builder: body,
+        );
+      }
+    } finally {
+      await _leavePanel();
+    }
+  }
+
+  Future<void> _arcade(ArcadeKind kind) async {
+    await _enterPanel();
+    if (!mounted) return;
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: widget.desktop ? Colors.transparent : Colors.black26,
+        builder: (ctx) => Dialog(
+          backgroundColor: paper,
+          insetPadding: const EdgeInsets.all(10),
+          child: SizedBox(
+            width: 480,
+            height: math.min(740, MediaQuery.sizeOf(ctx).height - 40),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: ArcadeRoom(
+                kind: kind,
+                best:
+                    ((state?['arcade'] as Map?)?[kind.name]?['best'] as num?)
+                        ?.toInt() ??
+                    0,
+                onResult: (runId, score) async {
+                  final result = await core!.call({
+                    'op': 'arcade_result',
+                    'game': kind.name,
+                    'run_id': runId,
+                    'score': score,
+                  });
+                  if (mounted) {
+                    state = result['state'];
+                    motion.play(PetMotion.happy);
+                    _refresh();
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+    } finally {
+      await _leavePanel();
+    }
   }
 
   Future<void> _personas() => _panel(
@@ -406,11 +503,14 @@ class _CompanionHomeState extends State<CompanionHome>
   );
   Future<void> _settings() async {
     inputFocus.unfocus();
+    await _enterPanel();
+    if (!mounted) return;
     final saved = await showDialog<ConnectionSettings>(
       context: context,
       builder: (_) =>
           ConnectionDialog(initialKey: keyValue, initialModel: model),
     );
+    await _leavePanel();
     if (saved != null && mounted) {
       keyValue = saved.key;
       model = saved.model;
@@ -654,7 +754,33 @@ class _CompanionHomeState extends State<CompanionHome>
           _memory,
         ),
         _menu(ctx, Icons.favorite_border_rounded, '相处方式', _personas),
-        if (chosen) _menu(ctx, Icons.bubble_chart_outlined, '找珍珠', _game),
+        if (chosen) ...[
+          _menu(ctx, Icons.bubble_chart_outlined, '找珍珠', _game),
+          _menu(
+            ctx,
+            Icons.grid_view_rounded,
+            '俄罗斯方块',
+            () => _arcade(ArcadeKind.tetris),
+          ),
+          _menu(
+            ctx,
+            Icons.sports_tennis_rounded,
+            '打砖块',
+            () => _arcade(ArcadeKind.breakout),
+          ),
+        ],
+        if (widget.desktop) ...[
+          SwitchListTile(
+            title: const Text('置顶陪伴'),
+            value: onTop,
+            onChanged: (v) {
+              onTop = v;
+              DesktopHost.onTop(v);
+              _refresh();
+            },
+          ),
+          _menu(ctx, Icons.close_rounded, '退出 Alice', DesktopHost.close),
+        ],
         _menu(ctx, Icons.tune_rounded, '连接 OpenAI', _settings),
       ],
     ),
@@ -684,296 +810,436 @@ class _CompanionHomeState extends State<CompanionHome>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFF7F5FD), Color(0xFFFCFAF8), Color(0xFFF1F5FA)],
-        ),
-      ),
-      child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                child: SizedBox(
-                  height: math.max(constraints.maxHeight, chatOpen ? 560 : 500),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 18),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFB4B8D8),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 9),
-                            const Text(
-                              'Alice',
-                              style: TextStyle(
-                                fontSize: 19,
-                                letterSpacing: 1.1,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              key: const ValueKey('more'),
-                              tooltip: '小小抽屉',
-                              onPressed: busy ? null : _more,
-                              icon: const Icon(
-                                Icons.more_horiz_rounded,
-                                color: muted,
-                              ),
-                            ),
-                          ],
+  Widget build(BuildContext context) => widget.desktop
+      ? _desktop()
+      : Scaffold(
+          body: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFFF7F5FD),
+                  Color(0xFFFCFAF8),
+                  Color(0xFFF1F5FA),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      child: SizedBox(
+                        height: math.max(
+                          constraints.maxHeight,
+                          chatOpen ? 560 : 500,
                         ),
-                        const SizedBox(height: 18),
-                        if (startupError != null) ...[
-                          Text(startupError!, textAlign: TextAlign.center),
-                          TextButton(
-                            onPressed: _open,
-                            child: const Text('重新打开'),
-                          ),
-                        ] else if (state == null)
-                          const LinearProgressIndicator(minHeight: 2)
-                        else
-                          GestureDetector(
-                            onTap: chosen && !busy ? _history : null,
-                            child: Container(
-                              key: const ValueKey('speech'),
-                              constraints: const BoxConstraints(minHeight: 84),
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 22,
-                                vertical: 18,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: .88),
-                                borderRadius: const BorderRadius.all(
-                                  Radius.circular(26),
-                                ),
-                                border: Border.all(color: Colors.white),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accent.withValues(alpha: .045),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                bubble,
-                                textAlign: TextAlign.center,
-                                maxLines: 4,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  height: 1.9,
-                                ),
-                              ),
-                            ),
-                          ),
-                        Expanded(
-                          child: ListenableBuilder(
-                            listenable: motion,
-                            builder: (context, _) => Column(
-                              children: [
-                                Expanded(
-                                  child: GestureDetector(
-                                    key: const ValueKey('pet'),
-                                    onTap: busy ? null : _pet,
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        FractionallySizedBox(
-                                          widthFactor: .85,
-                                          heightFactor: .82,
-                                          child: DecoratedBox(
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              gradient: RadialGradient(
-                                                colors: [
-                                                  const Color(
-                                                    0xFFE7E8F8,
-                                                  ).withValues(alpha: .7),
-                                                  const Color(
-                                                    0xFFE7E8F8,
-                                                  ).withValues(alpha: 0),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        Positioned(
-                                          bottom: 10,
-                                          child: Container(
-                                            width: 150,
-                                            height: 15,
-                                            decoration: BoxDecoration(
-                                              color: accent.withValues(
-                                                alpha: .08,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(100),
-                                            ),
-                                          ),
-                                        ),
-                                        Positioned.fill(
-                                          child: PetCharacter(
-                                            motion: motion.motion,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  motion.motion.label,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: muted,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        if (state != null && !chosen)
-                          FilledButton.tonal(
-                            onPressed: _personas,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 6,
-                              ),
-                              child: Text('选择她的性格'),
-                            ),
-                          )
-                        else if (chosen) ...[
-                          if (chatOpen)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 16, 24, 18),
+                          child: Column(
+                            children: [
+                              Row(
                                 children: [
-                                  Expanded(
-                                    child: TextField(
-                                      key: const ValueKey('chat-input'),
-                                      controller: input,
-                                      focusNode: inputFocus,
-                                      readOnly: busy,
-                                      minLines: 1,
-                                      maxLines: 3,
-                                      maxLength: 4000,
-                                      textInputAction: TextInputAction.send,
-                                      onSubmitted: (_) => _send(),
-                                      decoration: const InputDecoration(
-                                        hintText: '想说的话，慢慢说…',
-                                        counterText: '',
-                                      ),
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFB4B8D8),
+                                      shape: BoxShape.circle,
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  IconButton.filledTonal(
-                                    key: const ValueKey('send'),
-                                    tooltip: busy ? '停止回复' : '发送',
-                                    onPressed: busy
-                                        ? () => cancellation?.cancel()
-                                        : _send,
-                                    icon: Icon(
-                                      busy
-                                          ? Icons.stop_rounded
-                                          : Icons.arrow_upward_rounded,
+                                  const SizedBox(width: 9),
+                                  const Text(
+                                    'Alice',
+                                    style: TextStyle(
+                                      fontSize: 19,
+                                      letterSpacing: 1.1,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                                  const Spacer(),
                                   IconButton(
-                                    tooltip: '收起聊天',
-                                    onPressed: busy
-                                        ? null
-                                        : () {
-                                            inputFocus.unfocus();
-                                            chatOpen = false;
-                                            _refresh();
-                                          },
+                                    key: const ValueKey('more'),
+                                    tooltip: '小小抽屉',
+                                    onPressed: busy ? null : _more,
                                     icon: const Icon(
-                                      Icons.keyboard_arrow_down_rounded,
+                                      Icons.more_horiz_rounded,
                                       color: muted,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              _dock(
-                                Icons.chat_bubble_outline_rounded,
-                                '聊聊',
-                                _chat,
-                              ),
-                              _dock(Icons.favorite_border_rounded, '摸摸', _pet),
-                              _dock(
-                                Icons.local_cafe_outlined,
-                                '喝茶',
-                                () => _action('tea', PetMotion.tea),
-                              ),
-                              ListenableBuilder(
-                                listenable: motion,
-                                builder: (_, child) => _dock(
-                                  motion.sleeping
-                                      ? Icons.wb_sunny_outlined
-                                      : Icons.nightlight_outlined,
-                                  motion.sleeping ? '醒来' : '休息',
-                                  () {
-                                    if (motion.sleeping) {
-                                      motion.sleep(false);
-                                      motion.play(PetMotion.greeting);
-                                      localLine = '醒啦。我们继续慢慢来。';
-                                      _refresh();
-                                    } else {
-                                      _action('rest', PetMotion.sleeping);
-                                    }
-                                  },
+                              const SizedBox(height: 18),
+                              if (startupError != null) ...[
+                                Text(
+                                  startupError!,
+                                  textAlign: TextAlign.center,
+                                ),
+                                TextButton(
+                                  onPressed: _open,
+                                  child: const Text('重新打开'),
+                                ),
+                              ] else if (state == null)
+                                const LinearProgressIndicator(minHeight: 2)
+                              else
+                                GestureDetector(
+                                  onTap: chosen && !busy ? _history : null,
+                                  child: Container(
+                                    key: const ValueKey('speech'),
+                                    constraints: const BoxConstraints(
+                                      minHeight: 84,
+                                    ),
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 22,
+                                      vertical: 18,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(
+                                        alpha: .88,
+                                      ),
+                                      borderRadius: const BorderRadius.all(
+                                        Radius.circular(26),
+                                      ),
+                                      border: Border.all(color: Colors.white),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: accent.withValues(alpha: .045),
+                                          blurRadius: 24,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      bubble,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 4,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        height: 1.9,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              Expanded(
+                                child: ListenableBuilder(
+                                  listenable: motion,
+                                  builder: (context, _) => Column(
+                                    children: [
+                                      Expanded(
+                                        child: GestureDetector(
+                                          key: const ValueKey('pet'),
+                                          onTap: busy ? null : _pet,
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              FractionallySizedBox(
+                                                widthFactor: .85,
+                                                heightFactor: .82,
+                                                child: DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    gradient: RadialGradient(
+                                                      colors: [
+                                                        const Color(
+                                                          0xFFE7E8F8,
+                                                        ).withValues(alpha: .7),
+                                                        const Color(
+                                                          0xFFE7E8F8,
+                                                        ).withValues(alpha: 0),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned(
+                                                bottom: 10,
+                                                child: Container(
+                                                  width: 150,
+                                                  height: 15,
+                                                  decoration: BoxDecoration(
+                                                    color: accent.withValues(
+                                                      alpha: .08,
+                                                    ),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          100,
+                                                        ),
+                                                  ),
+                                                ),
+                                              ),
+                                              Positioned.fill(
+                                                child: PetCharacter(
+                                                  motion: motion.motion,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        motion.motion.label,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: muted,
+                                          letterSpacing: 1.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
+                              const SizedBox(height: 22),
+                              if (state != null && !chosen)
+                                FilledButton.tonal(
+                                  onPressed: _personas,
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 6,
+                                    ),
+                                    child: Text('选择她的性格'),
+                                  ),
+                                )
+                              else if (chosen) ...[
+                                if (chatOpen)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Expanded(
+                                          child: TextField(
+                                            key: const ValueKey('chat-input'),
+                                            controller: input,
+                                            focusNode: inputFocus,
+                                            readOnly: busy,
+                                            minLines: 1,
+                                            maxLines: 3,
+                                            maxLength: 4000,
+                                            textInputAction:
+                                                TextInputAction.send,
+                                            onSubmitted: (_) => _send(),
+                                            decoration: const InputDecoration(
+                                              hintText: '想说的话，慢慢说…',
+                                              counterText: '',
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        IconButton.filledTonal(
+                                          key: const ValueKey('send'),
+                                          tooltip: busy ? '停止回复' : '发送',
+                                          onPressed: busy
+                                              ? () => cancellation?.cancel()
+                                              : _send,
+                                          icon: Icon(
+                                            busy
+                                                ? Icons.stop_rounded
+                                                : Icons.arrow_upward_rounded,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: '收起聊天',
+                                          onPressed: busy
+                                              ? null
+                                              : () {
+                                                  inputFocus.unfocus();
+                                                  chatOpen = false;
+                                                  _refresh();
+                                                },
+                                          icon: const Icon(
+                                            Icons.keyboard_arrow_down_rounded,
+                                            color: muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    _dock(
+                                      Icons.chat_bubble_outline_rounded,
+                                      '聊聊',
+                                      _chat,
+                                    ),
+                                    _dock(
+                                      Icons.favorite_border_rounded,
+                                      '摸摸',
+                                      _pet,
+                                    ),
+                                    _dock(
+                                      Icons.local_cafe_outlined,
+                                      '喝茶',
+                                      () => _action('tea', PetMotion.tea),
+                                    ),
+                                    ListenableBuilder(
+                                      listenable: motion,
+                                      builder: (_, child) => _dock(
+                                        motion.sleeping
+                                            ? Icons.wb_sunny_outlined
+                                            : Icons.nightlight_outlined,
+                                        motion.sleeping ? '醒来' : '休息',
+                                        () {
+                                          if (motion.sleeping) {
+                                            motion.sleep(false);
+                                            motion.play(PetMotion.greeting);
+                                            localLine = '醒啦。我们继续慢慢来。';
+                                            _refresh();
+                                          } else {
+                                            _action('rest', PetMotion.sleeping);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              if (proposals.isNotEmpty)
+                                TextButton(
+                                  onPressed: busy ? null : _memory,
+                                  child: const Text('有件事，想问问你能不能记住'),
+                                )
+                              else
+                                Text(
+                                  configured
+                                      ? '小小鲸屿 · 有你在就好'
+                                      : '离线陪伴 · 也可以一起发呆',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: muted,
+                                    letterSpacing: .7,
+                                  ),
+                                ),
                             ],
                           ),
-                        ],
-                        const SizedBox(height: 12),
-                        if (proposals.isNotEmpty)
-                          TextButton(
-                            onPressed: busy ? null : _memory,
-                            child: const Text('有件事，想问问你能不能记住'),
-                          )
-                        else
-                          Text(
-                            configured ? '小小鲸屿 · 有你在就好' : '离线陪伴 · 也可以一起发呆',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: muted,
-                              letterSpacing: .7,
-                            ),
-                          ),
-                      ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        );
+  void _closeChat() {
+    inputFocus.unfocus();
+    chatOpen = false;
+    if (widget.desktop && panels == 0) DesktopHost.expanded(false);
+    _refresh();
+  }
+
+  void _rest() {
+    if (motion.sleeping) {
+      motion.sleep(false);
+      motion.play(PetMotion.greeting);
+      localLine = '醒啦。我们继续慢慢来。';
+      _refresh();
+    } else {
+      _action('rest', PetMotion.sleeping);
+    }
+  }
+
+  Widget _desktop() => ListenableBuilder(
+    listenable: motion,
+    builder: (context, _) => DesktopPet(
+      character: PetCharacter(motion: motion.motion),
+      bubble: bubble,
+      chosen: chosen,
+      busy: busy,
+      error: startupError,
+      onPet: _pet,
+      onChat: _chat,
+      onMore: _more,
+      onChoose: _personas,
+      controls: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          IconButton(
+            tooltip: '聊聊',
+            onPressed: busy ? null : _chat,
+            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 21),
+          ),
+          IconButton(
+            tooltip: '摸摸',
+            onPressed: busy ? null : _pet,
+            icon: const Icon(Icons.favorite_border_rounded, size: 21),
+          ),
+          IconButton(
+            tooltip: '喝茶',
+            onPressed: busy ? null : () => _action('tea', PetMotion.tea),
+            icon: const Icon(Icons.local_cafe_outlined, size: 21),
+          ),
+          IconButton(
+            tooltip: motion.sleeping ? '醒来' : '休息',
+            onPressed: busy ? null : _rest,
+            icon: Icon(
+              motion.sleeping
+                  ? Icons.wb_sunny_outlined
+                  : Icons.nightlight_outlined,
+              size: 21,
+            ),
+          ),
+          IconButton(
+            tooltip: '伸懒腰',
+            onPressed: busy
+                ? null
+                : () => motion.play(
+                    PetMotion.stretching,
+                    duration: const Duration(seconds: 6),
+                  ),
+            icon: const Icon(Icons.self_improvement_rounded, size: 21),
+          ),
+          IconButton(
+            key: const ValueKey('more'),
+            tooltip: '小小抽屉',
+            onPressed: busy ? null : _more,
+            icon: const Icon(Icons.more_horiz_rounded, size: 21),
+          ),
+        ],
       ),
+      composer: chatOpen
+          ? Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('chat-input'),
+                    controller: input,
+                    focusNode: inputFocus,
+                    readOnly: busy,
+                    minLines: 1,
+                    maxLines: 3,
+                    maxLength: 4000,
+                    onSubmitted: (_) => _send(),
+                    decoration: const InputDecoration(
+                      hintText: '想说的话，慢慢说…',
+                      counterText: '',
+                    ),
+                  ),
+                ),
+                IconButton.filledTonal(
+                  key: const ValueKey('send'),
+                  tooltip: busy ? '停止回复' : '发送',
+                  onPressed: busy ? () => cancellation?.cancel() : _send,
+                  icon: Icon(
+                    busy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '收起聊天',
+                  onPressed: busy ? null : _closeChat,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            )
+          : null,
     ),
   );
   Widget _dock(IconData icon, String title, VoidCallback onTap) => Column(

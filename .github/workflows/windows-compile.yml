@@ -1,0 +1,35 @@
+name: Windows desktop compile
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/companion/**', '.github/workflows/windows-compile.yml']
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Install verified Flutter 3.47.9
+        shell: pwsh
+        run: |
+          $releaseIndex = Invoke-RestMethod 'https://storage.googleapis.com/flutter_infra_release/releases/releases_windows.json'
+          $release = $releaseIndex.releases | Where-Object { $_.version -eq '3.47.9' -and $_.dart_sdk_arch -eq 'x64' } | Select-Object -First 1
+          if (!$release) { throw 'Pinned Flutter release not found' }
+          $archive = Join-Path $env:RUNNER_TEMP 'alice-flutter.zip'
+          curl.exe -fL --retry 3 "$($releaseIndex.base_url)/$($release.archive)" -o $archive
+          if ($LASTEXITCODE -ne 0) { throw 'SDK download failed' }
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLower() -ne $release.sha256) { throw 'SDK checksum mismatch' }
+          $sdk = Join-Path $env:RUNNER_TEMP 'alice-sdk'
+          7z x $archive "-o$sdk" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'SDK extraction failed' }
+          "$sdk\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+      - name: Prepare artwork
+        run: python scripts/prepare-assets.py
+      - name: Compile native transparent window and Flutter UI
+        working-directory: apps/companion
+        run: |
+          flutter pub get
+          flutter build windows --release --no-pub

@@ -19,40 +19,60 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+// Native window operations stay outside the pet, memory and API layers.
+static void desktop_method(FlMethodChannel*, FlMethodCall* call, gpointer data) {
+  GtkWindow* window = GTK_WINDOW(data);
+  const gchar* name = fl_method_call_get_name(call);
+  FlValue* args = fl_method_call_get_args(call);
+  if (g_strcmp0(name, "expanded") == 0) {
+    const bool expanded = args != nullptr && fl_value_get_bool(args);
+    gint x, y, old_w, old_h;
+    gtk_window_get_position(window, &x, &y);
+    gtk_window_get_size(window, &old_w, &old_h);
+    GdkRectangle area = {0, 0, 1920, 1080};
+    GdkWindow* native = gtk_widget_get_window(GTK_WIDGET(window));
+    GdkMonitor* monitor = gdk_display_get_monitor_at_window(gtk_widget_get_display(GTK_WIDGET(window)), native);
+    if (monitor != nullptr) gdk_monitor_get_workarea(monitor, &area);
+    const gint w = MIN(expanded ? 500 : 360, area.width);
+    const gint h = MIN(expanded ? 780 : 520, area.height);
+    gtk_window_resize(window, w, h);
+    gtk_window_move(window, MAX(area.x, MIN(x + old_w - w, area.x + area.width - w)), MAX(area.y, MIN(y + old_h - h, area.y + area.height - h)));
+    gtk_window_present(window);
+  } else if (g_strcmp0(name, "drag") == 0) {
+    GdkDisplay* display = gtk_widget_get_display(GTK_WIDGET(window));
+    GdkDevice* pointer = gdk_seat_get_pointer(gdk_display_get_default_seat(display));
+    gint x = 0, y = 0;
+    gdk_device_get_position(pointer, nullptr, &x, &y);
+    gtk_window_begin_move_drag(window, 1, x, y, gtk_get_current_event_time());
+  } else if (g_strcmp0(name, "onTop") == 0) {
+    gtk_window_set_keep_above(window, args != nullptr && fl_value_get_bool(args));
+  } else if (g_strcmp0(name, "close") == 0) {
+    fl_method_call_respond_success(call, nullptr, nullptr);
+    gtk_window_close(window);
+    return;
+  } else {
+    fl_method_call_respond_not_implemented(call, nullptr);
+    return;
+  }
+  fl_method_call_respond_success(call, nullptr, nullptr);
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
-  // Use a header bar when running in GNOME as this is the common style used
-  // by applications and is the setup most users will be using (e.g. Ubuntu
-  // desktop).
-  // If running on X and not using GNOME then just use a traditional title bar
-  // in case the window manager does more exotic layout, e.g. tiling.
-  // If running on Wayland assume the header bar will work (may need changing
-  // if future cases occur).
-  gboolean use_header_bar = TRUE;
-#ifdef GDK_WINDOWING_X11
-  GdkScreen* screen = gtk_window_get_screen(window);
-  if (GDK_IS_X11_SCREEN(screen)) {
-    const gchar* wm_name = gdk_x11_screen_get_window_manager_name(screen);
-    if (g_strcmp0(wm_name, "GNOME Shell") != 0) {
-      use_header_bar = FALSE;
-    }
-  }
-#endif
-  if (use_header_bar) {
-    GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
-    gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "Alice · 小小鲸屿");
-    gtk_header_bar_set_show_close_button(header_bar, TRUE);
-    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
-  } else {
-    gtk_window_set_title(window, "Alice · 小小鲸屿");
-  }
-
-  gtk_window_set_default_size(window, 480, 760);
+  gtk_window_set_title(window, "Alice · 小小鲸屿");
+  gtk_window_set_decorated(window, FALSE);
+  gtk_window_set_keep_above(window, TRUE);
+  gtk_window_set_default_size(window, 360, 520);
+  gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+  GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
+  if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);
+  g_autoptr(GtkCssProvider) css = gtk_css_provider_new();
+  gtk_css_provider_load_from_data(css, "window { background-color: transparent; box-shadow: none; }", -1, nullptr);
+  gtk_style_context_add_provider(gtk_widget_get_style_context(GTK_WIDGET(window)), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
@@ -62,7 +82,7 @@ static void my_application_activate(GApplication* application) {
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
-  gdk_rgba_parse(&background_color, "#000000");
+  gdk_rgba_parse(&background_color, "rgba(0,0,0,0)");
   fl_view_set_background_color(view, &background_color);
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
@@ -74,6 +94,9 @@ static void my_application_activate(GApplication* application) {
   gtk_widget_realize(GTK_WIDGET(view));
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
+  g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
+  g_autoptr(FlMethodChannel) channel = fl_method_channel_new(fl_engine_get_binary_messenger(fl_view_get_engine(view)), "alice/desktop", FL_METHOD_CODEC(codec));
+  fl_method_channel_set_method_call_handler(channel, desktop_method, window, nullptr);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

@@ -95,6 +95,7 @@ fn validate_state(s: &Value) -> Result<(), String> {
         || !s["last_action"].is_object()
         || !s["energy"].is_number()
         || !s["comfort"].is_number()
+        || (!s["arcade"].is_null() && !s["arcade"].is_object())
         || !["messages", "memories", "events"]
             .iter()
             .all(|k| s[k].is_array())
@@ -223,6 +224,43 @@ pub fn execute(path: &str, request: Value, at: i64) -> Result<Value, String> {
                         s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 4.0).min(100.0));
                     }
                     _ => unreachable!(),
+                }
+            }
+            "arcade_result" => {
+                profile(s["persona"].as_str().ok_or("请先选择性格")?)?;
+                let game = text(&request, "game", 20)?;
+                if !["tetris", "breakout"].contains(&game) {
+                    return Err("未知小游戏".into());
+                }
+                let run_id = text(&request, "run_id", 80)?;
+                let score = request["score"]
+                    .as_u64()
+                    .filter(|v| *v <= 10_000_000)
+                    .ok_or("无效成绩")?;
+                let mut runs = s["arcade"][game]["recent_runs"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default();
+                if runs.iter().any(|v| v.as_str() == Some(run_id)) {
+                    mutated = false;
+                } else {
+                    runs.push(json!(run_id));
+                    if runs.len() > 30 {
+                        runs.remove(0);
+                    }
+                    let best = s["arcade"][game]["best"].as_u64().unwrap_or(0).max(score);
+                    let plays = s["arcade"][game]["plays"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .saturating_add(1);
+                    s["arcade"][game] =
+                        json!({"best":best,"last":score,"plays":plays,"recent_runs":runs});
+                    let label = if game == "tetris" {
+                        "俄罗斯方块"
+                    } else {
+                        "打砖块"
+                    };
+                    event(&mut s, at, &format!("一起玩了{}，本局 {} 分", label, score));
                 }
             }
             "remember" => {

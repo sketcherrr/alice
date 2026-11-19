@@ -20,7 +20,7 @@ for alice_symbol in alice_call alice_free alice_alloc alice_dealloc; do
   done
 done
 alice_assets="$alice_app/Contents/Frameworks/App.framework/Resources/flutter_assets/assets"
-for alice_asset in character.png NotoSansCJKsc-Regular.otf animations/calm.png animations/social.png animations/activities.png; do
+for alice_asset in character.png NotoSansCJKsc-Regular.otf animations/calm.png animations/social.png animations/activities.png animations/idle-v2.png animations/social-v2.png animations/rest-v2.png; do
   [[ -s "$alice_assets/$alice_asset" ]] || { echo "Missing asset: $alice_asset" >&2; exit 1; }
 done
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$alice_app"

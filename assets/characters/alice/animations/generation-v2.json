@@ -1,0 +1,40 @@
+{
+  "tool": "built-in image_gen",
+  "date": "2026-11-19",
+  "alpha": "Generated transparent RGBA, original pixels preserved",
+  "sheets": [
+    {
+      "file": "idle-v2.png",
+      "columns": 4,
+      "rows": 4,
+      "states": [
+        "idle",
+        "greeting"
+      ],
+      "frames_per_state": 8,
+      "prompt": "Use case: identity-preserve. Create a production animation sprite atlas for Alice, the EXACT cute blue-haired whale-hood chibi in the reference. Preserve her face, hair, whale hair clip and hood, navy/cream sailor hoodie, blue bow, short skirt, opaque socks, shoes and whale tail. This is a replacement animation asset, not a redesign. Transparent RGBA background, no ground, no shadows, no letters, no grid lines. Square canvas, ideally 2048 x 2048. EXACTLY 4 columns and 4 rows, 16 equally sized square cells, one complete centered full-body Alice per cell, consistent baseline/scale/camera. Each pose stays comfortably inside its cell with at least 10% clear margin. The first TWO rows are ONE smooth 8-frame idle breathing and blink cycle in reading order: relaxed standing, breath in, subtle hair/tail follow-through, eyelids lowering, closed blink, eyelids open, breath out, settle matching first pose. Last TWO rows are ONE smooth 8-frame friendly greeting: raise right hand, begin wave, wrist tilts left, wrist tilts right, tiny smile/head tilt, wrist returns, hand lowers, settle. Restrained continuous motion, no jumps in identity, lighting, body scale or position between frames. Crisp detailed anime linework and consistent cel shading. All 16 figures fully visible including feet and tail. Actual transparent background, not a checkerboard."
+    },
+    {
+      "file": "social-v2.png",
+      "columns": 4,
+      "rows": 4,
+      "states": [
+        "happy",
+        "stretching"
+      ],
+      "frames_per_state": 8,
+      "prompt": "Use case: identity-preserve. Production transparent animation sprite atlas. Reference is Alice: preserve EXACT blue fluffy hair, whale hood and hairclip, blue eyes, navy and cream sailor hoodie, blue bow, short skirt, opaque socks, shoes, whale tail, face and proportions. Square canvas 2048x2048 if possible; EXACTLY 4 columns x 4 rows, 16 equal square cells. Every cell holds ONE complete full-body character at same scale, centered on identical baseline, generous margins, no cropping. Read frames left-to-right then next row. First TWO rows: ONE continuous 8-frame happy animation: soft smile and hands near cheeks, delighted eyes closing, little shoulder lift, cheeks squish into hands, tiny knee bounce, tail curls gently, eyes open, settle matching beginning. Last TWO rows: ONE continuous 8-frame stretching/yawn animation: relaxed arms, elbows rise, both arms stretch above head with sleepy closed eyes, hold long stretch, lean gently to one side, return upright, arms lower, relaxed smiling return. Do not duplicate the same pose in all cells. Use natural fine changes in eyelids, hands, shoulders, hair tips and tail. Crisp anime outlines, careful consistent cel shading, 2D chibi game asset, not a redesign. Each figure stays within its square cell. Actual transparent alpha background, no floor/shadow, no text, labels, borders, checkerboard or extra figures."
+    },
+    {
+      "file": "rest-v2.png",
+      "columns": 4,
+      "rows": 4,
+      "states": [
+        "tea",
+        "sleeping"
+      ],
+      "frames_per_state": 8,
+      "prompt": "Use case: identity-preserve. A polished production 2D animation sprite sheet of the reference Alice. Preserve the exact blue-haired whale-girl identity, whale hood and hairclip, navy/cream hoodie, blue bow, skirt, opaque socks and shoes, whale tail. Actual transparent alpha background; no scene, ground, cast shadows, checkerboard, words, frame labels or grid. Square canvas, 2048x2048 preferred. EXACTLY 4 columns and 4 rows, 16 equally sized square cells. Every cell has exactly one complete full-body Alice, uniform scale and consistent baseline with generous transparent margin. TOP TWO ROWS are a single smooth 8-frame tea-drinking sequence, reading order: holding small cream mug at chest with both hands, lift slightly, lift toward mouth, eyes half close, gentle sip with closed eyes, lower cup a little, satisfied soft smile, mug back at chest matching first frame. BOTTOM TWO ROWS are a single smooth 8-frame sleeping breathing loop: Alice curled into a small seated resting pose with hands at cheek and her own whale tail around her; eyes always closed; subtle inhale in shoulders, tiny hair tip movement, relaxed exhale, head settles, and repeats. All seated frames identical body scale and stable seated baseline, naturally shorter than standing tea poses; do not fill the cell by enlarging seated figure. Delicate anime linework, controlled cel shading, cute and warm. Fine continuous differences between adjacent frames, no abrupt movement or redesign."
+    }
+  ]
+}

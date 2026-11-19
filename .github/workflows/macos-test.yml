@@ -69,6 +69,8 @@ jobs:
           rustc --version
       - name: Build, verify and archive universal app
         run: bash scripts/build-macos.sh
+      - name: Verify saved game scores and core invariants
+        run: cargo test --locked
       - name: Analyze and test on macOS
         working-directory: apps/companion
         env:
