@@ -78,7 +78,7 @@ class _CompanionHomeState extends State<CompanionHome>
   String progress = '';
   bool busy = false, chatOpen = false, onTop = true;
   int panels = 0;
-  Timer? idleTimer;
+  Timer? idleTimer, panelResizeTimer;
   String keyValue = Platform.environment['OPENAI_API_KEY'] ?? '';
   String model = Platform.environment['OPENAI_MODEL'] ?? '';
   final input = TextEditingController(), memoryInput = TextEditingController();
@@ -124,6 +124,7 @@ class _CompanionHomeState extends State<CompanionHome>
     WidgetsBinding.instance.removeObserver(this);
     cancellation?.cancel();
     idleTimer?.cancel();
+    panelResizeTimer?.cancel();
     motion.dispose();
     inputFocus.dispose();
     input.dispose();
@@ -291,15 +292,20 @@ class _CompanionHomeState extends State<CompanionHome>
   }
 
   Future<void> _enterPanel() async {
+    panelResizeTimer?.cancel();
     panels++;
     if (widget.desktop) await DesktopHost.expanded(true);
   }
 
-  Future<void> _leavePanel() async {
-    await Future<void>.delayed(const Duration(milliseconds: 220));
+  void _leavePanel() {
     panels = math.max(0, panels - 1);
-    if (mounted && widget.desktop && panels == 0 && !chatOpen)
-      await DesktopHost.expanded(false);
+    panelResizeTimer?.cancel();
+    if (!mounted || !widget.desktop || panels != 0 || chatOpen) return;
+    // Let the route finish closing before resizing, but cancel on disposal
+    // or when another panel opens during this transition.
+    panelResizeTimer = Timer(const Duration(milliseconds: 220), () {
+      if (mounted && panels == 0 && !chatOpen) DesktopHost.expanded(false);
+    });
   }
 
   Future<void> _panel(
@@ -379,7 +385,7 @@ class _CompanionHomeState extends State<CompanionHome>
         );
       }
     } finally {
-      await _leavePanel();
+      _leavePanel();
     }
   }
 
@@ -424,7 +430,7 @@ class _CompanionHomeState extends State<CompanionHome>
         ),
       );
     } finally {
-      await _leavePanel();
+      _leavePanel();
     }
   }
 
@@ -510,7 +516,7 @@ class _CompanionHomeState extends State<CompanionHome>
       builder: (_) =>
           ConnectionDialog(initialKey: keyValue, initialModel: model),
     );
-    await _leavePanel();
+    _leavePanel();
     if (saved != null && mounted) {
       keyValue = saved.key;
       model = saved.model;

@@ -75,6 +75,9 @@ void main() {
       await tapReady(tester, find.byKey(const ValueKey('close-panel')));
       await tester.pump(const Duration(seconds: 1));
       expect(calls, contains('expanded:false'));
+      // Disposing during the route's close animation must cancel resizing.
+      await tapReady(tester, find.byKey(const ValueKey('more')));
+      await tapReady(tester, find.byKey(const ValueKey('close-panel')));
       await mouse.removePointer();
       await tester.pumpWidget(const SizedBox());
       expect(tester.takeException(), isNull);
