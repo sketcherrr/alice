@@ -188,6 +188,7 @@ class CompanionAudio extends ChangeNotifier {
       starting = false,
       recording = false;
   bool speaking = false, generating = false, autoSpeak = true;
+  bool finishing = false;
   int track = 0;
   double musicLevel = .3, voiceLevel = .8;
   VoiceStyle style = VoiceStyle.sweet;
@@ -196,10 +197,12 @@ class CompanionAudio extends ChangeNotifier {
       ? '正在听，松开就发送…'
       : starting
       ? '正在打开麦克风…'
+      : finishing
+      ? '正在收好这段话…'
       : generating
       ? 'Alice 正在准备声音…'
       : speaking
-      ? 'Alice 在说话…'
+      ? 'Alice 在说话 · AI 合成语音'
       : '';
   bool _closed = false, _held = false;
   int _speechEpoch = 0;
@@ -213,7 +216,7 @@ class CompanionAudio extends ChangeNotifier {
   CompanionAudio({CompanionAudioDevice? device, OpenAiVoice? api})
     : device = device ?? NativeAudioDevice(),
       api = api ?? OpenAiVoice();
-  double get effectiveMusicLevel => starting || recording
+  double get effectiveMusicLevel => starting || recording || finishing
       ? 0
       : speaking || generating
       ? musicLevel * .22
@@ -346,15 +349,17 @@ class CompanionAudio extends ChangeNotifier {
 
   Future<void> say(String text, String key) async {
     if (_closed) return;
-    await stopSpeech();
-    if (_closed) return;
     final epoch = ++_speechEpoch;
+    _speechToken?.cancel();
     final token = TurnCancellation();
     _speechToken = token;
+    speaking = false;
     generating = true;
     error = null;
     _emit();
     try {
+      await device.stopVoice();
+      if (_closed || epoch != _speechEpoch) return;
       await _duck();
       final wav = await api.speak(
         text,
@@ -401,7 +406,7 @@ class CompanionAudio extends ChangeNotifier {
   }
 
   Future<void> beginCapture() async {
-    if (_closed || starting || recording) return;
+    if (_closed || starting || recording || finishing) return;
     _held = true;
     starting = true;
     error = null;
@@ -453,6 +458,9 @@ class CompanionAudio extends ChangeNotifier {
     await _captureSetup;
     if (!recording || _closed) return null;
     _recordLimit?.cancel();
+    recording = false;
+    finishing = true;
+    _emit();
     final short = (_recordClock?.elapsedMilliseconds ?? 0) < 350;
     try {
       if (short) {
@@ -465,7 +473,7 @@ class CompanionAudio extends ChangeNotifier {
       error = '这次录音没有保存成功，请再试一次。';
       return null;
     } finally {
-      recording = false;
+      finishing = false;
       try {
         await _duck();
       } catch (_) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:alice_companion/audio_companion.dart';
@@ -19,6 +20,7 @@ class FakeAudioDevice implements CompanionAudioDevice {
   double musicGain = 0, voiceGain = 0;
   Completer<bool>? permission;
   Completer<void>? playback;
+  Completer<Uint8List?>? stopResult;
   @override
   Future<void> music(int track, double volume) async {
     playing = true;
@@ -65,7 +67,7 @@ class FakeAudioDevice implements CompanionAudioDevice {
   @override
   Future<Uint8List?> stopRecording() async {
     recording = false;
-    return Uint8List(100);
+    return stopResult == null ? Uint8List(100) : await stopResult!.future;
   }
 
   @override
@@ -84,13 +86,17 @@ class FakeAudioDevice implements CompanionAudioDevice {
 
 class FakeVoice extends OpenAiVoice {
   final generated = Completer<Uint8List>();
+  int calls = 0;
   @override
   Future<Uint8List> speak(
     String text, {
     required String key,
     required VoiceStyle style,
     required TurnCancellation cancellation,
-  }) => generated.future;
+  }) {
+    calls++;
+    return generated.future;
+  }
 }
 
 Future<void> tick() => Future<void>.delayed(const Duration(milliseconds: 10));
@@ -157,6 +163,12 @@ void main() {
         ),
       );
       await tester.pump(const Duration(milliseconds: 400));
+      final mouse = await tester.createGesture(
+        kind: ui.PointerDeviceKind.mouse,
+      );
+      await mouse.addPointer(location: const Offset(1, 1));
+      await mouse.moveTo(tester.getCenter(find.byKey(const ValueKey('pet'))));
+      await tester.pump(const Duration(milliseconds: 300));
       // No key: the explicit recording action opens connection settings.
       await tester.tap(find.byKey(const ValueKey('hold-to-speak')));
       await tester.pump(const Duration(milliseconds: 400));
@@ -192,11 +204,45 @@ void main() {
         isEmpty,
       );
       await audio.stopSpeech();
+      // Moving away while the recorder is finishing must not upload later.
+      device.stopResult = Completer<Uint8List?>();
+      final second = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('hold-to-speak'))),
+      );
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)),
+      );
+      await second.up();
+      await tester.pump();
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      device.stopResult!.complete(Uint8List(100));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(api.transcriptions, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      await mouse.removePointer();
       await tester.pumpWidget(const SizedBox());
       expect(tester.takeException(), isNull);
     },
   );
   test('offline speech protocol checks', protocol.runVoiceChecks);
+  test('rapid voice requests only start the newest synthesis', () async {
+    final device = FakeAudioDevice(), api = FakeVoice();
+    final audio = CompanionAudio(device: device, api: api);
+    addTearDown(audio.dispose);
+    final old = audio.say('旧句子', 'test-only');
+    final latest = audio.say('新句子', 'test-only');
+    await tick();
+    expect(api.calls, 1);
+    api.generated.complete(Uint8List(100));
+    await tick();
+    expect(device.plays, 1);
+    await audio.stopSpeech();
+    await old;
+    await latest;
+  });
   test('music ducks for voice and mutes for capture, then recovers', () async {
     final device = FakeAudioDevice();
     final api = FakeVoice();

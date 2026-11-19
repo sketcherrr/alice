@@ -102,7 +102,8 @@ class _CompanionHomeState extends State<CompanionHome>
   Timer? idleTimer, panelResizeTimer;
   late final CompanionAudio audio;
   String? lastAudioError;
-  bool get capturing => audio.starting || audio.recording;
+  int voiceGestureEpoch = 0;
+  bool get capturing => audio.starting || audio.recording || audio.finishing;
   String keyValue = Platform.environment['OPENAI_API_KEY'] ?? '';
   String model = Platform.environment['OPENAI_MODEL'] ?? '';
   final input = TextEditingController(), memoryInput = TextEditingController();
@@ -144,11 +145,13 @@ class _CompanionHomeState extends State<CompanionHome>
   void _audioChanged() {
     if (!mounted) return;
     motion.listen(capturing || inputFocus.hasFocus);
-    if (audio.error != null && audio.error != lastAudioError) {
-      lastAudioError = audio.error;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _notice(lastAudioError!);
-      });
+    final error = audio.error;
+    if (error != lastAudioError) {
+      lastAudioError = error;
+      if (error != null)
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _notice(error);
+        });
     }
     _refresh();
   }
@@ -156,7 +159,7 @@ class _CompanionHomeState extends State<CompanionHome>
   @override
   void didChangeAppLifecycleState(AppLifecycleState value) {
     if (value != AppLifecycleState.resumed) {
-      unawaited(audio.cancelCapture());
+      _cancelVoiceCapture();
       unawaited(audio.stopSpeech());
       if (cancellation != null && progress == '正在听清你说的话')
         cancellation?.cancel();
@@ -373,12 +376,19 @@ class _CompanionHomeState extends State<CompanionHome>
     }
     motion.sleep(false);
     inputFocus.unfocus();
+    voiceGestureEpoch++;
     await audio.beginCapture();
   }
 
+  void _cancelVoiceCapture() {
+    voiceGestureEpoch++;
+    unawaited(audio.cancelCapture());
+  }
+
   Future<void> _endVoice() async {
+    final epoch = voiceGestureEpoch;
     final wav = await audio.endCapture();
-    if (wav == null || !mounted || busy) return;
+    if (wav == null || !mounted || busy || epoch != voiceGestureEpoch) return;
     busy = true;
     progress = '正在听清你说的话';
     final token = TurnCancellation();
@@ -416,7 +426,7 @@ class _CompanionHomeState extends State<CompanionHome>
         audio.speaking || audio.generating || (busy && cancellation != null),
     onStart: () => unawaited(_beginVoice()),
     onEnd: () => unawaited(_endVoice()),
-    onCancel: () => unawaited(audio.cancelCapture()),
+    onCancel: _cancelVoiceCapture,
     onStop: () {
       cancellation?.cancel();
       unawaited(audio.stopSpeech());
