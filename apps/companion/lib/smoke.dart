@@ -10,6 +10,7 @@ import 'core.dart';
 import 'agent.dart';
 import 'character_animation.dart';
 import 'openai.dart';
+import 'audio_companion.dart';
 
 final surface = GlobalKey();
 final failures = <String>[];
@@ -138,6 +139,7 @@ Future<void> mount(CompanionCore core, double width, double height) async {
             child: AliceApp(
               core: core,
               agent: CompanionAgent(transport: smokeTransport),
+              audio: CompanionAudio()..autoSpeak = false,
             ),
           ),
         ),

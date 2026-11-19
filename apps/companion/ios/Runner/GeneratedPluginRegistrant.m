@@ -6,9 +6,23 @@
 
 #import "GeneratedPluginRegistrant.h"
 
+#if __has_include(<audioplayers_darwin/AudioplayersDarwinPlugin.h>)
+#import <audioplayers_darwin/AudioplayersDarwinPlugin.h>
+#else
+@import audioplayers_darwin;
+#endif
+
+#if __has_include(<record_darwin/RecordDarwinPlugin.h>)
+#import <record_darwin/RecordDarwinPlugin.h>
+#else
+@import record_darwin;
+#endif
+
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
+  [AudioplayersDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"AudioplayersDarwinPlugin"]];
+  [RecordDarwinPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordDarwinPlugin"]];
 }
 
 @end

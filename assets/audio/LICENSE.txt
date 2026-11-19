@@ -1,0 +1,8 @@
+Alice original lo-fi loops — CC0 1.0 Universal
+
+The music in tide-window.mp3 and moon-postcard.mp3 was composed and synthesized
+for this project using scripts/compose-lofi.py. No third-party recordings,
+samples or compositions were used. To the extent possible under law, the
+authors waive copyright and related rights in these music assets under CC0.
+
+https://creativecommons.org/publicdomain/zero/1.0/

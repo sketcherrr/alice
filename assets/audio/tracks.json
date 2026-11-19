@@ -1,0 +1,22 @@
+{
+  "authoring": "scripts/compose-lofi.py",
+  "sample_sources": "None; synthesized oscillators and seeded noise.",
+  "tracks": [
+    {
+      "file": "tide-window.mp3",
+      "title": "窗边小潮汐",
+      "bpm": 76,
+      "seconds": 50.526,
+      "license": "CC0-1.0",
+      "seed": 2026111901
+    },
+    {
+      "file": "moon-postcard.mp3",
+      "title": "月亮寄来的明信片",
+      "bpm": 68,
+      "seconds": 56.471,
+      "license": "CC0-1.0",
+      "seed": 2026111902
+    }
+  ]
+}

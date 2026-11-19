@@ -77,6 +77,10 @@ Future<void> main() async {
     await smoke.capture('breakout', out);
     await smoke.tapKey('close-arcade');
     smoke.check(failures.isEmpty, failures.join('\n'));
+    await smoke.drawer('声音小窝 · lo-fi 与语音');
+    await smoke.capture('sound-panel', out);
+    await smoke.tapKey('close-panel');
+    smoke.check(failures.isEmpty, failures.join('\n'));
     stdout.writeln(
       'PASS: transparent idle canvas contains only the pet, Tetris and Breakout launch, render, pause and close.',
     );

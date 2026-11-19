@@ -8,6 +8,8 @@ import 'core.dart';
 import 'openai.dart';
 import 'desktop_pet.dart';
 import 'arcade.dart';
+import 'audio_companion.dart';
+import 'sound_widgets.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +25,14 @@ class AliceApp extends StatelessWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
   final bool desktop;
-  const AliceApp({super.key, this.core, this.agent, this.desktop = false});
+  final CompanionAudio? audio;
+  const AliceApp({
+    super.key,
+    this.core,
+    this.agent,
+    this.audio,
+    this.desktop = false,
+  });
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Alice · 小小鲸屿',
@@ -56,7 +65,12 @@ class AliceApp extends StatelessWidget {
         ),
       ),
     ),
-    home: CompanionHome(core: core, agent: agent, desktop: desktop),
+    home: CompanionHome(
+      core: core,
+      agent: agent,
+      audio: audio,
+      desktop: desktop,
+    ),
   );
 }
 
@@ -64,7 +78,14 @@ class CompanionHome extends StatefulWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
   final bool desktop;
-  const CompanionHome({super.key, this.core, this.agent, this.desktop = false});
+  final CompanionAudio? audio;
+  const CompanionHome({
+    super.key,
+    this.core,
+    this.agent,
+    this.audio,
+    this.desktop = false,
+  });
   @override
   State<CompanionHome> createState() => _CompanionHomeState();
 }
@@ -79,6 +100,9 @@ class _CompanionHomeState extends State<CompanionHome>
   bool busy = false, chatOpen = false, onTop = true;
   int panels = 0;
   Timer? idleTimer, panelResizeTimer;
+  late final CompanionAudio audio;
+  String? lastAudioError;
+  bool get capturing => audio.starting || audio.recording;
   String keyValue = Platform.environment['OPENAI_API_KEY'] ?? '';
   String model = Platform.environment['OPENAI_MODEL'] ?? '';
   final input = TextEditingController(), memoryInput = TextEditingController();
@@ -101,6 +125,8 @@ class _CompanionHomeState extends State<CompanionHome>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    audio = widget.audio ?? CompanionAudio();
+    audio.addListener(_audioChanged);
     inputFocus.addListener(() => motion.listen(inputFocus.hasFocus));
     _open();
     idleTimer = Timer.periodic(const Duration(seconds: 55), (_) {
@@ -108,13 +134,33 @@ class _CompanionHomeState extends State<CompanionHome>
           !busy &&
           !chatOpen &&
           panels == 0 &&
+          !capturing &&
+          !audio.speaking &&
           motion.motion == PetMotion.idle)
         motion.play(PetMotion.stretching, duration: const Duration(seconds: 6));
     });
   }
 
+  void _audioChanged() {
+    if (!mounted) return;
+    motion.listen(capturing || inputFocus.hasFocus);
+    if (audio.error != null && audio.error != lastAudioError) {
+      lastAudioError = audio.error;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _notice(lastAudioError!);
+      });
+    }
+    _refresh();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState value) {
+    if (value != AppLifecycleState.resumed) {
+      unawaited(audio.cancelCapture());
+      unawaited(audio.stopSpeech());
+      if (cancellation != null && progress == '正在听清你说的话')
+        cancellation?.cancel();
+    }
     if (value == AppLifecycleState.resumed && !busy && core != null)
       _run({'op': 'snapshot'});
   }
@@ -122,6 +168,8 @@ class _CompanionHomeState extends State<CompanionHome>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    audio.removeListener(_audioChanged);
+    if (widget.audio == null) audio.dispose();
     cancellation?.cancel();
     idleTimer?.cancel();
     panelResizeTimer?.cancel();
@@ -143,6 +191,11 @@ class _CompanionHomeState extends State<CompanionHome>
   Future<void> _open() async {
     try {
       core = widget.core ?? await NativeCore.create();
+      if (core case final NativeCore native) {
+        await audio.loadPreferences(
+          File('${File(native.databasePath).parent.path}/audio.json'),
+        );
+      }
       final result = await core!.call({'op': 'snapshot'});
       if (!mounted) return;
       state = result['state'];
@@ -244,11 +297,13 @@ class _CompanionHomeState extends State<CompanionHome>
 
   Future<void> _send() async {
     final text = input.text.trim();
-    if (busy || text.isEmpty || core == null || !chosen) return;
+    if (busy || capturing || text.isEmpty || core == null || !chosen) return;
     if (!configured) {
       await _settings();
       return;
     }
+    await audio.stopSpeech();
+    if (!mounted) return;
     inputFocus.unfocus();
     busy = true;
     localLine = null;
@@ -278,6 +333,17 @@ class _CompanionHomeState extends State<CompanionHome>
       );
       if (result.animation != null)
         motion.play(PetMotion.values.byName(result.animation!));
+      if (audio.autoSpeak) {
+        final replies = messages.where((m) => m['role'] == 'assistant');
+        if (replies.isNotEmpty) {
+          final text = replies.last['content'] as String;
+          if (text.runes.length <= 1200) {
+            unawaited(audio.say(text, keyValue.trim()));
+          } else {
+            _notice('这条回复比较长，先阅读文字吧；自动朗读限 1200 字。');
+          }
+        }
+      }
     } catch (e) {
       _notice(_error(e));
     } finally {
@@ -290,6 +356,92 @@ class _CompanionHomeState extends State<CompanionHome>
       }
     }
   }
+
+  Future<void> _beginVoice() async {
+    if (busy || capturing) return;
+    if (!chosen) {
+      await _personas();
+      return;
+    }
+    if (!configured) {
+      await _settings();
+      return;
+    }
+    if (input.text.trim().isNotEmpty) {
+      _notice('输入框里还有草稿，先发送或清空，再说话吧。');
+      return;
+    }
+    motion.sleep(false);
+    inputFocus.unfocus();
+    await audio.beginCapture();
+  }
+
+  Future<void> _endVoice() async {
+    final wav = await audio.endCapture();
+    if (wav == null || !mounted || busy) return;
+    busy = true;
+    progress = '正在听清你说的话';
+    final token = TurnCancellation();
+    cancellation = token;
+    _refresh();
+    String? transcript;
+    try {
+      transcript = await audio.api.transcribe(
+        wav,
+        key: keyValue.trim(),
+        cancellation: token,
+      );
+      if (!mounted || token.cancelled) return;
+      input.text = transcript;
+      chatOpen = true;
+      if (widget.desktop) await DesktopHost.expanded(true);
+    } catch (e) {
+      if (mounted && !token.cancelled) _notice(_error(e));
+    } finally {
+      if (mounted) {
+        busy = false;
+        progress = '';
+        cancellation = null;
+        _refresh();
+      }
+    }
+    if (mounted && !token.cancelled && transcript != null) await _send();
+  }
+
+  Widget _voiceButton() => HoldToSpeak(
+    key: const ValueKey('hold-to-speak'),
+    enabled: !busy,
+    active: capturing,
+    stopping:
+        audio.speaking || audio.generating || (busy && cancellation != null),
+    onStart: () => unawaited(_beginVoice()),
+    onEnd: () => unawaited(_endVoice()),
+    onCancel: () => unawaited(audio.cancelCapture()),
+    onStop: () {
+      cancellation?.cancel();
+      unawaited(audio.stopSpeech());
+    },
+  );
+
+  Future<void> _sounds() => _panel(
+    '声音小窝',
+    (ctx) => SoundPanel(
+      audio: audio,
+      onPreview: () {
+        if (keyValue.trim().isEmpty) {
+          _notice('先在连接 OpenAI 中填写 Key，再来试听。');
+          return;
+        }
+        unawaited(
+          audio.say('嘿，我是 Alice。把今天的小烦恼放一放吧，我陪你听一会儿音乐。', keyValue.trim()),
+        );
+      },
+      onConnect: () {
+        Navigator.pop(ctx);
+        unawaited(_settings());
+      },
+    ),
+  );
 
   Future<void> _enterPanel() async {
     panelResizeTimer?.cancel();
@@ -785,8 +937,19 @@ class _CompanionHomeState extends State<CompanionHome>
               _refresh();
             },
           ),
-          _menu(ctx, Icons.close_rounded, '退出 Alice', DesktopHost.close),
+          _menu(ctx, Icons.close_rounded, '退出 Alice', () async {
+            cancellation?.cancel();
+            await audio.shutdown();
+            await DesktopHost.close();
+          }),
         ],
+        _menu(ctx, Icons.headphones_rounded, '声音小窝 · lo-fi 与语音', _sounds),
+        _menu(ctx, Icons.self_improvement_rounded, '伸个懒腰', () async {
+          motion.play(
+            PetMotion.stretching,
+            duration: const Duration(seconds: 6),
+          );
+        }),
         _menu(ctx, Icons.tune_rounded, '连接 OpenAI', _settings),
       ],
     ),
@@ -808,6 +971,7 @@ class _CompanionHomeState extends State<CompanionHome>
     },
   );
   String get bubble {
+    if (audio.status.isNotEmpty) return audio.status;
     if (busy && cancellation != null) return '$progress…';
     if (localLine != null) return localLine!;
     if (!chosen) return '你好呀，我是 Alice。\n想在你的日常里，留一小片海。';
@@ -1023,7 +1187,7 @@ class _CompanionHomeState extends State<CompanionHome>
                                             key: const ValueKey('chat-input'),
                                             controller: input,
                                             focusNode: inputFocus,
-                                            readOnly: busy,
+                                            readOnly: busy || capturing,
                                             minLines: 1,
                                             maxLines: 3,
                                             maxLength: 4000,
@@ -1037,6 +1201,7 @@ class _CompanionHomeState extends State<CompanionHome>
                                           ),
                                         ),
                                         const SizedBox(width: 6),
+                                        _voiceButton(),
                                         IconButton.filledTonal(
                                           key: const ValueKey('send'),
                                           tooltip: busy ? '停止回复' : '发送',
@@ -1159,14 +1324,14 @@ class _CompanionHomeState extends State<CompanionHome>
       character: PetCharacter(motion: motion.motion),
       bubble: bubble,
       chosen: chosen,
-      busy: busy,
+      busy: busy || capturing || audio.speaking || audio.generating,
       error: startupError,
       onPet: _pet,
       onChat: _chat,
       onMore: _more,
       onChoose: _personas,
-      controls: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      controls: Wrap(
+        alignment: WrapAlignment.center,
         children: [
           IconButton(
             tooltip: '聊聊',
@@ -1193,15 +1358,17 @@ class _CompanionHomeState extends State<CompanionHome>
               size: 21,
             ),
           ),
+          _voiceButton(),
           IconButton(
-            tooltip: '伸懒腰',
-            onPressed: busy
-                ? null
-                : () => motion.play(
-                    PetMotion.stretching,
-                    duration: const Duration(seconds: 6),
-                  ),
-            icon: const Icon(Icons.self_improvement_rounded, size: 21),
+            key: const ValueKey('music-quick'),
+            tooltip: audio.playing ? '暂停 lo-fi' : '播放 lo-fi',
+            onPressed: audio.musicLoading ? null : audio.toggleMusic,
+            icon: Icon(
+              audio.playing
+                  ? Icons.pause_circle_outline_rounded
+                  : Icons.music_note_rounded,
+              size: 21,
+            ),
           ),
           IconButton(
             key: const ValueKey('more'),
@@ -1219,7 +1386,7 @@ class _CompanionHomeState extends State<CompanionHome>
                     key: const ValueKey('chat-input'),
                     controller: input,
                     focusNode: inputFocus,
-                    readOnly: busy,
+                    readOnly: busy || capturing,
                     minLines: 1,
                     maxLines: 3,
                     maxLength: 4000,
@@ -1306,7 +1473,7 @@ class _ConnectionDialogState extends State<ConnectionDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '填入你自己的 Key，就能和 Alice 自由聊天。',
+              '填入你自己的 Key，就能和 Alice 聊天、说话。',
               style: TextStyle(color: muted, height: 1.8),
             ),
             const SizedBox(height: 20),
@@ -1327,13 +1494,13 @@ class _ConnectionDialogState extends State<ConnectionDialog> {
               controller: modelInput,
               autocorrect: false,
               decoration: const InputDecoration(
-                labelText: '模型 ID',
+                labelText: '聊天模型 ID',
                 hintText: '填写你的账号可用的模型',
               ),
             ),
             const SizedBox(height: 16),
             const Text(
-              '使用 OpenAI 官方 Responses 接口，支持函数调用。Key 仅用于本次启动，不写入存档。\n\n发送时会提供当前人设、相关记忆和近期对话。',
+              'Key 仅用于本次启动，不写入存档。聊天使用 Responses 接口，发送当前人设、相关记忆和近期对话。\n\n语音会另行使用录音识别与声音生成接口；自动朗读和音色可在「声音小窝」调整。',
               style: TextStyle(fontSize: 12, color: muted, height: 1.7),
             ),
             if (error != null)
