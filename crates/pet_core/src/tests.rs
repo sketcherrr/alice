@@ -176,3 +176,80 @@ fn future_schema_is_refused_without_overwriting_it() {
         .unwrap_err()
         .contains("更新版本"));
 }
+
+#[test]
+fn care_migrates_old_saves_without_losing_memories_or_progress() {
+    let save = Save::new();
+    save.select();
+    save.call(json!({"op":"remember","content":"喜欢海边"}), 1000);
+    let mut old = save.call(json!({"op":"snapshot"}), 1000)["state"].clone();
+    old["version"] = json!(1);
+    for key in ["satiety", "cleanliness", "sleeping"] {
+        old.as_object_mut().unwrap().remove(key);
+    }
+    let db = Db::open(&save.0).unwrap();
+    db.run(
+        "UPDATE companion SET data=?1 WHERE id=1",
+        Some(&old.to_string()),
+    )
+    .unwrap();
+    db.run("PRAGMA user_version=1", None).unwrap();
+    drop(db);
+    let migrated = save.call(json!({"op":"snapshot"}), 1000)["state"].clone();
+    for key in [
+        "memories", "messages", "energy", "comfort", "persona", "revision",
+    ] {
+        assert_eq!(old[key], migrated[key]);
+    }
+    assert_eq!(migrated["satiety"], 70.0);
+    assert_eq!(migrated["sleeping"], false);
+    assert_eq!(
+        Db::open(&save.0)
+            .unwrap()
+            .run("PRAGMA user_version", None)
+            .unwrap(),
+        Some("2".into())
+    );
+}
+
+#[test]
+fn sleep_survives_restart_and_does_not_reward_repeated_toggles() {
+    let save = Save::new();
+    save.select();
+    let start = save.call(json!({"op":"action","action":"rest"}), 1000)["state"].clone();
+    assert_eq!(start["energy"], 80.0);
+    let duplicate = save.call(json!({"op":"action","action":"rest"}), 1000)["state"].clone();
+    assert_eq!(start, duplicate);
+    assert!(execute(&save.0, json!({"op":"action","action":"feed"}), 1000).is_err());
+    let hour = save.call(json!({"op":"snapshot"}), 4600)["state"].clone();
+    assert_eq!(hour["sleeping"], true);
+    assert_eq!(hour["energy"], 88.0);
+    let wake = save.call(json!({"op":"action","action":"wake"}), 4600)["state"].clone();
+    assert_eq!(wake["sleeping"], false);
+    assert_eq!(wake["energy"], 88.0);
+    assert_eq!(
+        wake,
+        save.call(json!({"op":"action","action":"wake"}), 4600)["state"]
+    );
+    let later = save.call(json!({"op":"snapshot"}), 8200)["state"].clone();
+    assert_eq!(later["energy"], 86.5);
+}
+
+#[test]
+fn feeding_bathing_cooldowns_and_absence_are_bounded() {
+    let save = Save::new();
+    save.select();
+    let feed = save.call(json!({"op":"action","action":"feed"}), 1000)["state"].clone();
+    assert_eq!(feed["satiety"], 95.0);
+    assert!(execute(&save.0, json!({"op":"action","action":"feed"}), 1000).is_err());
+    let bath = save.call(json!({"op":"action","action":"bath"}), 1000)["state"].clone();
+    assert_eq!(bath["cleanliness"], 100.0);
+    assert!(execute(&save.0, json!({"op":"action","action":"bath"}), 1001).is_err());
+    let away = save.call(json!({"op":"snapshot"}), 1000 + 86400 * 365)["state"].clone();
+    assert!(away["satiety"].as_f64().unwrap() >= 20.0);
+    assert!(away["cleanliness"].as_f64().unwrap() >= 25.0);
+    let backwards = save.call(json!({"op":"snapshot"}), 0)["state"].clone();
+    for key in ["energy", "comfort", "satiety", "cleanliness"] {
+        assert_eq!(away[key], backwards[key]);
+    }
+}

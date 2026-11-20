@@ -161,7 +161,15 @@ class CompanionTools {
         return {
           'ok': true,
           'state': {
-            for (final k in ['persona', 'energy', 'comfort', 'last_tick'])
+            for (final k in [
+              'persona',
+              'energy',
+              'comfort',
+              'satiety',
+              'cleanliness',
+              'sleeping',
+              'last_tick',
+            ])
               k: snapshot[k],
           },
           'recent_events': (snapshot['events'] as List).reversed

@@ -13,6 +13,8 @@ enum PetMotion {
   tea,
   sleeping,
   stretching,
+  feeding,
+  bathing,
 }
 
 extension MotionSpec on PetMotion {
@@ -25,10 +27,15 @@ extension MotionSpec on PetMotion {
     PetMotion.tea => '一起喝杯茶',
     PetMotion.sleeping => '小憩一会儿',
     PetMotion.stretching => '伸个懒腰，慢慢来',
+    PetMotion.feeding => '啊呜，点心时间',
+    PetMotion.bathing => '洗个香香的泡泡澡',
   };
   String get sheet => switch (this) {
     PetMotion.idle || PetMotion.greeting => 'idle-v2',
-    PetMotion.happy || PetMotion.stretching => 'social-v2',
+    PetMotion.happy ||
+    PetMotion.stretching ||
+    PetMotion.feeding ||
+    PetMotion.bathing => 'social-v2',
     PetMotion.tea || PetMotion.sleeping => 'rest-v2',
     PetMotion.listening => 'calm',
     PetMotion.thinking => 'activities',
@@ -48,7 +55,9 @@ extension MotionSpec on PetMotion {
     PetMotion.listening => [1300, 650, 140, 700],
     PetMotion.thinking => [900, 650, 140, 800],
     PetMotion.greeting => [260, 200, 200, 200, 200, 200, 230, 300],
-    PetMotion.happy => [260, 220, 260, 300, 260, 240, 260, 400],
+    PetMotion.happy ||
+    PetMotion.feeding ||
+    PetMotion.bathing => [260, 220, 260, 300, 260, 240, 260, 400],
     PetMotion.tea => [700, 400, 450, 600, 900, 550, 450, 700],
     PetMotion.sleeping => [900, 900, 900, 900, 900, 900, 900, 900],
     PetMotion.stretching => [500, 550, 600, 900, 850, 700, 500, 500],
@@ -286,6 +295,54 @@ class _SpritePainter extends CustomPainter {
       Paint()..filterQuality = FilterQuality.high,
     );
     canvas.restore();
+    if (motion == PetMotion.feeding || motion == PetMotion.bathing) {
+      for (var i = 0; i < 7; i++) {
+        final t = reduced ? i / 7 : (seconds * .35 + i / 7) % 1;
+        final x = size.width * (.2 + (i % 4) * .2) + math.sin(t * 6 + i) * 10;
+        final y = size.height - side * (.18 + t * .6);
+        final paint = Paint()
+          ..color =
+              (motion == PetMotion.bathing
+                      ? const Color(0xFFB7DDEB)
+                      : const Color(0xFFEBC19A))
+                  .withValues(alpha: .65 * math.sin(t * math.pi));
+        if (motion == PetMotion.bathing) {
+          canvas.drawCircle(Offset(x, y), 9 + i % 3 * 4, paint);
+          canvas.drawCircle(
+            Offset(x - 3, y - 3),
+            3,
+            Paint()..color = Colors.white.withValues(alpha: .7),
+          );
+        } else {
+          canvas.drawCircle(Offset(x, y), 3, paint);
+        }
+      }
+      if (motion == PetMotion.feeding) {
+        final y =
+            size.height -
+            side * .28 +
+            (reduced ? 0 : math.sin(seconds * 3) * 4);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(size.width / 2, y + 12),
+            width: 76,
+            height: 14,
+          ),
+          Paint()..color = const Color(0xFFD6E8F5),
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromCenter(
+              center: Offset(size.width / 2, y),
+              width: 40,
+              height: 28,
+            ),
+            const Radius.circular(12),
+          ),
+          Paint()..color = const Color(0xFFF0CF9E),
+        );
+      }
+    }
     if (!reduced &&
         (motion == PetMotion.happy || motion == PetMotion.stretching)) {
       for (var i = 0; i < 3; i++) {

@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:record/record.dart';
 import 'openai.dart';
 import 'voice_api.dart';
+import 'local_library.dart';
+import 'package:file_selector/file_selector.dart';
 
 const lofiTracks = [
   ('窗边小潮汐', 'audio/tide-window.mp3', '76 BPM · 晒着太阳发会儿呆'),
@@ -28,13 +30,17 @@ abstract interface class CompanionAudioDevice {
 
 /// Native devices are created only after an explicit playback/record action.
 /// Raw recordings and generated speech live only in temporary directories.
-class NativeAudioDevice implements CompanionAudioDevice {
+abstract interface class LocalMusicDevice {
+  Future<void> musicFile(String path, double volume);
+}
+
+class NativeAudioDevice implements CompanionAudioDevice, LocalMusicDevice {
   AudioPlayer? _music, _voice;
   AudioRecorder? _recorder;
   Directory? _recordDirectory;
   Completer<void>? _voiceDone;
   int _voiceSerial = 0;
-  int? _loadedTrack;
+  String? _loadedSource;
   final _context = AudioContext(
     android: const AudioContextAndroid(audioFocus: AndroidAudioFocus.none),
     iOS: AudioContextIOS(
@@ -46,20 +52,21 @@ class NativeAudioDevice implements CompanionAudioDevice {
     ),
   );
   @override
-  Future<void> music(int track, double volume) async {
+  Future<void> music(int track, double volume) =>
+      _playMusic(AssetSource(lofiTracks[track].$2), 'asset:$track', volume);
+  @override
+  Future<void> musicFile(String path, double volume) =>
+      _playMusic(DeviceFileSource(path), path, volume);
+  Future<void> _playMusic(Source source, String id, double volume) async {
     final player = _music ??= AudioPlayer();
     await player.setReleaseMode(ReleaseMode.loop);
-    if (_loadedTrack == track && player.state == PlayerState.paused) {
+    if (_loadedSource == id && player.state == PlayerState.paused) {
       await player.setVolume(volume);
       await player.resume();
       return;
     }
-    await player.play(
-      AssetSource(lofiTracks[track].$2),
-      volume: volume,
-      ctx: _context,
-    );
-    _loadedTrack = track;
+    await player.play(source, volume: volume, ctx: _context);
+    _loadedSource = id;
   }
 
   @override
@@ -190,6 +197,81 @@ class CompanionAudio extends ChangeNotifier {
   bool speaking = false, generating = false, autoSpeak = true;
   bool finishing = false;
   int track = 0;
+  LocalLibrary? library;
+  Timer? _musicTimer;
+  Future<void>? _playOperation;
+  int _timerEpoch = 0;
+  int? sleepMinutes;
+  int get trackCount => lofiTracks.length + (library?.tracks.length ?? 0);
+  String trackTitle(int index) => index < lofiTracks.length
+      ? lofiTracks[index].$1
+      : library!.tracks[index - lofiTracks.length].name;
+  String trackSubtitle(int index) =>
+      index < lofiTracks.length ? lofiTracks[index].$3 : '本地收藏 · 离线播放';
+
+  Future<void> importMusic(XFile file) async {
+    if (musicLoading || library == null || _closed) return;
+    musicLoading = true;
+    error = null;
+    _emit();
+    try {
+      final index = await library!.import(file);
+      if (playing) await device.pauseMusic();
+      playing = false;
+      track = lofiTracks.length + index;
+      savePreferences();
+    } catch (e) {
+      error = e is StateError ? e.message.toString() : '音乐导入失败，原文件没有改动。';
+    } finally {
+      musicLoading = false;
+      _emit();
+    }
+  }
+
+  Future<void> removeTrack(int index) async {
+    if (musicLoading || library == null || index < lofiTracks.length || _closed)
+      return;
+    musicLoading = true;
+    try {
+      if (track == index) {
+        await device.pauseMusic();
+        playing = false;
+      }
+      await library!.remove(index - lofiTracks.length);
+      if (track == index)
+        track = 0;
+      else if (track > index)
+        track--;
+      savePreferences();
+    } catch (_) {
+      error = '这首音乐暂时没能移除。';
+    } finally {
+      musicLoading = false;
+      _emit();
+    }
+  }
+
+  void setSleepTimer(int? minutes) {
+    _musicTimer?.cancel();
+    final epoch = ++_timerEpoch;
+    sleepMinutes = minutes;
+    if (minutes != null) {
+      _musicTimer = Timer(Duration(minutes: minutes), () async {
+        sleepMinutes = null;
+        await _playOperation;
+        if (_closed || epoch != _timerEpoch) return;
+        try {
+          await device.pauseMusic();
+          playing = false;
+        } catch (_) {
+          error = '定时暂停失败，请手动暂停音乐。';
+        }
+        _emit();
+      });
+    }
+    _emit();
+  }
+
   double musicLevel = .3, voiceLevel = .8;
   VoiceStyle style = VoiceStyle.sweet;
   String? error;
@@ -234,13 +316,20 @@ class CompanionAudio extends ChangeNotifier {
 
   Future<void> loadPreferences(File file) async {
     _preferences = file;
+    library = LocalLibrary(Directory('${file.parent.path}/music'));
+    try {
+      await library!.load();
+    } catch (_) {
+      library = null;
+      error = '音乐目录暂时无法读取，内置音乐仍可用。';
+    }
     try {
       if (!await file.exists()) return;
       final data = jsonDecode(await file.readAsString()) as Map;
       if (_closed) return;
       musicLevel = (data['musicVolume'] as num? ?? .3).toDouble().clamp(0, 1);
       voiceLevel = (data['voiceVolume'] as num? ?? .8).toDouble().clamp(0, 1);
-      track = (data['track'] as int? ?? 0).clamp(0, lofiTracks.length - 1);
+      track = (data['track'] as int? ?? 0).clamp(0, trackCount - 1);
       autoSpeak = data['autoSpeak'] != false;
       style = VoiceStyle.values.firstWhere(
         (s) => s.name == data['style'],
@@ -276,7 +365,12 @@ class CompanionAudio extends ChangeNotifier {
         });
   }
 
-  Future<void> toggleMusic() async {
+  Future<void> toggleMusic() {
+    if (_closed || musicLoading) return Future.value();
+    return _playOperation = _toggleMusic();
+  }
+
+  Future<void> _toggleMusic() async {
     if (_closed || musicLoading) return;
     musicLoading = true;
     error = null;
@@ -286,12 +380,21 @@ class CompanionAudio extends ChangeNotifier {
         await device.pauseMusic();
         playing = false;
       } else {
-        await device.music(track, effectiveMusicLevel);
+        if (track < lofiTracks.length) {
+          await device.music(track, effectiveMusicLevel);
+        } else if (device case final LocalMusicDevice local) {
+          await local.musicFile(
+            library!.path(library!.tracks[track - lofiTracks.length]),
+            effectiveMusicLevel,
+          );
+        } else {
+          throw StateError('当前播放器不支持本地文件。');
+        }
         playing = true;
       }
     } catch (_) {
       playing = false;
-      error = '音乐没能播放，请检查声音输出设备。';
+      error = '音乐没能播放，请检查声音设备与音乐格式的解码支持。';
     } finally {
       musicLoading = false;
       _emit();
@@ -300,7 +403,7 @@ class CompanionAudio extends ChangeNotifier {
 
   Future<void> selectTrack(int value) async {
     if (musicLoading || _closed) return;
-    track = value.clamp(0, lofiTracks.length - 1);
+    track = value.clamp(0, trackCount - 1);
     savePreferences();
     if (playing) {
       playing = false;
@@ -511,6 +614,7 @@ class CompanionAudio extends ChangeNotifier {
   Future<void> shutdown() {
     if (_shutdown != null) return _shutdown!;
     _closed = true;
+    _musicTimer?.cancel();
     _held = false;
     _speechEpoch++;
     _speechToken?.cancel();

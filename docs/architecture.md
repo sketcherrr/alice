@@ -54,3 +54,15 @@ SQLite 通过一个小型 C ABI 封装使用系统 SQLite 库。所有状态修�
 三个透明 PNG 图集由内置生图功能生成并原样复制到资源包；Flutter 运行时按网格取帧，不在动画过程中重复解码。角色支持系统减少动画设置，应用进入后台停止动画时钟。
 
 完整 Agent 协议和边界见 [agent-runtime.md](agent-runtime.md)。
+
+## 设备模式（0.4）
+
+`device_mode.dart` 提供设备布局及 `device.json` 外观偏好；`ALICE_DEVICE_MODE` 显式选择全屏／预览，不改变普通桌面透明角色模式。Rust schema 2 新增 satiety、cleanliness、sleeping，迁移与 SQLite user_version 在同一事务内提交。睡眠持续到 wake，离线结算最多 48 小时；喂食／洗澡有冷却、上限，睡着时拒绝这些动作。旧版本会拒绝新版存档。
+
+`wifi.dart` 仅在用户打开 Linux 配网面板时连接系统 D-Bus；扫描按 SSID 原始字节、频段和加密类型分组。5GHz 设置使用 NetworkManager `802-11-wireless.band=a`，2.4GHz 为 `bg`，不合并同名双频网络。密码通过 D-Bus 交给 NetworkManager，不经 shell、SQLite 或模型。成功反馈等待连接 activated，实际系统授权、地区信道与重连仍需真机验证。
+
+`local_library.dart` 复制用户选取的本地音乐，限制大小、数量与格式签名，内容哈希去重并限制 manifest 文件名。`audio_companion.dart` 复用现有音乐／语音音量策略播放导入文件；无自动联网下载、加密音乐解锁或网易云登录。移除只作用于应用副本。
+
+待机仅停止角色动画、显示时钟及覆盖半透明暗层；背光、传感器、BLE/A2DP 仍待实现。`wakeSignal` 为显示唤醒入口，未来传感器应经去抖与权限受限的硬件服务进入；模型不能执行系统命令。当前没有真实传感器连接按钮。
+
+树莓派构建与自启动操作见 README 的 0.4 部分。尚未在 ARM64 真机构建与运行，x64 验证不等于完成树莓派支持。

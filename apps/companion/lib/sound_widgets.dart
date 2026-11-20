@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'audio_companion.dart';
 import 'voice_api.dart';
+import 'package:file_selector/file_selector.dart';
 
 /// Pointer cancellation, leaving the button, and accessibility toggle are
 /// explicit; a short tap never secretly starts a background recording.
@@ -125,10 +126,10 @@ class SoundPanel extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         const Text(
-          '两首原创 lo-fi，断网也能听。',
+          '内置与本地收藏，断网也能听。当前单曲循环。',
           style: TextStyle(color: Color(0xFF8A8CA4)),
         ),
-        for (var i = 0; i < lofiTracks.length; i++)
+        for (var i = 0; i < audio.trackCount; i++)
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: Icon(
@@ -136,9 +137,18 @@ class SoundPanel extends StatelessWidget {
                   ? Icons.graphic_eq_rounded
                   : Icons.music_note_rounded,
             ),
-            title: Text(lofiTracks[i].$1),
-            subtitle: Text(lofiTracks[i].$3),
+            title: Text(audio.trackTitle(i)),
+            subtitle: Text(audio.trackSubtitle(i)),
             selected: audio.track == i,
+            trailing: i < lofiTracks.length
+                ? null
+                : IconButton(
+                    tooltip: '移除收藏',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: audio.musicLoading
+                        ? null
+                        : () => audio.removeTrack(i),
+                  ),
             onTap: audio.musicLoading ? null : () => audio.selectTrack(i),
           ),
         FilledButton.tonalIcon(
@@ -148,6 +158,45 @@ class SoundPanel extends StatelessWidget {
             audio.playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
           ),
           label: Text(audio.playing ? '先安静一会儿' : '放点 lo-fi'),
+        ),
+        TextButton.icon(
+          key: const ValueKey('import-music'),
+          onPressed: audio.musicLoading || audio.library == null
+              ? null
+              : () async {
+                  try {
+                    final file = await openFile(
+                      acceptedTypeGroups: const [
+                        XTypeGroup(
+                          label: '音乐',
+                          extensions: ['mp3', 'wav', 'flac'],
+                          uniformTypeIdentifiers: ['public.audio'],
+                        ),
+                      ],
+                    );
+                    if (file != null) await audio.importMusic(file);
+                  } catch (_) {
+                    if (context.mounted)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('文件选择器没有打开，请稍后再试。')),
+                      );
+                  }
+                },
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('导入音乐'),
+        ),
+        DropdownButtonFormField<int>(
+          key: ValueKey('music-timer-${audio.sleepMinutes}'),
+          initialValue: audio.sleepMinutes ?? 0,
+          decoration: const InputDecoration(labelText: '定时暂停'),
+          items: [
+            for (final n in [0, 15, 30, 60])
+              DropdownMenuItem(
+                value: n,
+                child: Text(n == 0 ? '一直陪你听' : '$n 分钟后暂停'),
+              ),
+          ],
+          onChanged: (n) => audio.setSleepTimer(n == 0 ? null : n),
         ),
         _volume('音乐音量', audio.musicLevel, audio.setMusicLevel),
         const Divider(height: 30),

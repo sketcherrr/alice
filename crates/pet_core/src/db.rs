@@ -56,12 +56,11 @@ impl Db {
             sqlite3_busy_timeout(db.0, 5000);
         }
         let version = db.run("PRAGMA user_version", None)?.unwrap_or_default();
-        if version != "0" && version != "1" {
+        if version != "0" && version != "1" && version != "2" {
             return Err("存档来自更新版本，请升级应用后打开".into());
         }
         db.run("PRAGMA synchronous=FULL", None)?;
         db.run("CREATE TABLE IF NOT EXISTS companion (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)", None)?;
-        db.run("PRAGMA user_version=1", None)?;
         Ok(db)
     }
     pub fn run(&self, sql: &str, value: Option<&str>) -> Result<Option<String>, String> {

@@ -24,6 +24,11 @@ static void desktop_method(FlMethodChannel*, FlMethodCall* call, gpointer data) 
   GtkWindow* window = GTK_WINDOW(data);
   const gchar* name = fl_method_call_get_name(call);
   FlValue* args = fl_method_call_get_args(call);
+  const bool device_mode = g_object_get_data(G_OBJECT(window), "alice-device-mode") != nullptr;
+  if (device_mode && (g_strcmp0(name, "expanded") == 0 || g_strcmp0(name, "drag") == 0 || g_strcmp0(name, "onTop") == 0)) {
+    fl_method_call_respond_success(call, nullptr, nullptr);
+    return;
+  }
   if (g_strcmp0(name, "expanded") == 0) {
     const bool expanded = args != nullptr && fl_value_get_bool(args);
     gint x, y, old_w, old_h;
@@ -63,10 +68,19 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
 
+  const gchar* mode = g_getenv("ALICE_DEVICE_MODE");
+  bool device_mode = g_strcmp0(mode, "1") == 0 || g_strcmp0(mode, "preview") == 0;
+  bool fullscreen = g_strcmp0(mode, "1") == 0;
+  for (char** arg = self->dart_entrypoint_arguments; arg && *arg; ++arg) {
+    if (g_strcmp0(*arg, "--device") == 0) { device_mode = true; fullscreen = true; }
+    if (g_strcmp0(*arg, "--device-preview") == 0) device_mode = true;
+  }
+  g_object_set_data(G_OBJECT(window), "alice-device-mode", device_mode ? GINT_TO_POINTER(1) : nullptr);
   gtk_window_set_title(window, "Alice · 小小鲸屿");
   gtk_window_set_decorated(window, FALSE);
-  gtk_window_set_keep_above(window, TRUE);
-  gtk_window_set_default_size(window, 360, 520);
+  gtk_window_set_keep_above(window, !device_mode);
+  gtk_window_set_default_size(window, device_mode ? 540 : 360, device_mode ? 860 : 520);
+  if (fullscreen) gtk_window_fullscreen(window);
   gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
   GdkVisual* visual = gdk_screen_get_rgba_visual(gtk_window_get_screen(window));
   if (visual != nullptr) gtk_widget_set_visual(GTK_WIDGET(window), visual);

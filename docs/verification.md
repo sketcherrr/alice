@@ -104,3 +104,13 @@ dart scripts/check-agent.dart
 已取回 0.3.0（build 3）Mac 应用 ZIP，44,205,485 字节。附件与应用摘要、CRC、麦克风用途声明、两首音乐与源素材逐字节一致性、framework 符号链接均已核对。主程序、Flutter 引擎、Dart AOT、Rust 核心、objective_c 运行库共 5 个 Mach-O 二进制全部包含 arm64 与 x86_64。签名、Sandbox 出站联网和 audio-input 权限在 macOS CI 校验通过。
 
 应用 ZIP SHA-256：`465ba33026febba4fad308d0e7ac7b7f2c4749733c3ce08001f3168abe26a67d`。本机副本为 `dist/Alice-macOS-universal-test.zip`，下载见 [macOS 测试说明](macos-testing.md)。
+
+## 0.4 设备模式本地验证（2026-11-20）
+
+- 11 项 Rust 测试通过，新增旧存档无损迁移、持续睡眠／重复操作、养成边界检查。
+- Flutter 静态分析通过；Linux x64 release 构建通过，包括文件选择器及 D-Bus 配网代码。
+- 真实 Flutter 无界面引擎＋Rust/SQLite 验证：设备画面、喂食／洗澡、睡眠跨重新打开恢复、欢迎语保存、待机／触摸唤醒、本地音乐导入／去重／恢复／删除以及 5GHz 与 2.4GHz 配置区分。截图在 `artifacts/device-v4/`。
+- 原有离线、Agent、语音协议检查通过，均未调用真实 API。
+- 自启动安装／移除及正常退出在临时目录中验证，未修改当前桌面的启动项。
+- 标准 Flutter 测试命令在本环境无法监听 127.0.0.1，测试套件未在本机执行完成；不能将引擎检查冒充完整套件通过。
+- 未操作当前系统的 Wi-Fi；未进行真实音频输出、5GHz 连接、ARM64／树莓派或 iPhone 测试。

@@ -30,7 +30,7 @@ trap 'rm -f "$alice_entitlements"' EXIT
 python3 - "$alice_entitlements" <<'PY'
 import plistlib,sys
 with open(sys.argv[1],'rb') as f: entitlements=plistlib.load(f)
-for key in ('com.apple.security.app-sandbox','com.apple.security.network.client','com.apple.security.device.audio-input'):
+for key in ('com.apple.security.app-sandbox','com.apple.security.network.client','com.apple.security.device.audio-input','com.apple.security.files.user-selected.read-only'):
     if entitlements.get(key) is not True: raise SystemExit('Missing entitlement: '+key)
 print('PASS: universal app, native FFI symbols, assets, signatures, sandbox and network entitlement.')
 PY

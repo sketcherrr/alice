@@ -38,7 +38,7 @@ fn text<'a>(v: &'a Value, key: &str, max: usize) -> Result<&'a str, String> {
     }
 }
 fn new_state(at: i64) -> Value {
-    json!({"version":1,"persona":null,"energy":80.0,"comfort":70.0,"created_at":at,"last_tick":at,"revision":0,"next_id":1,"context_start_id":0,"last_action":{},"messages":[],"memories":[],"events":[],"game":null})
+    json!({"version":2,"persona":null,"energy":80.0,"comfort":70.0,"satiety":70.0,"cleanliness":80.0,"sleeping":false,"created_at":at,"last_tick":at,"revision":0,"next_id":1,"context_start_id":0,"last_action":{},"messages":[],"memories":[],"events":[],"game":null})
 }
 fn append(s: &mut Value, list: &str, item: Value, limit: usize) {
     let items = s[list].as_array_mut().expect("state array");
@@ -68,8 +68,15 @@ fn message(s: &mut Value, at: i64, role: &str, content: &str, mode: &str) {
 fn settle(s: &mut Value, at: i64) {
     let previous = s["last_tick"].as_i64().unwrap();
     let hours = (at - previous).clamp(0, 172800) as f64 / 3600.0;
-    s["energy"] = json!((s["energy"].as_f64().unwrap() - hours * 1.5).clamp(30.0, 100.0));
+    let sleeping = s["sleeping"] == true;
+    s["energy"] = json!((s["energy"].as_f64().unwrap()
+        + hours * if sleeping { 8.0 } else { -1.5 })
+    .clamp(30.0, 100.0));
     s["comfort"] = json!((s["comfort"].as_f64().unwrap() - hours * 0.5).clamp(35.0, 100.0));
+    s["satiety"] = json!((s["satiety"].as_f64().unwrap()
+        - hours * if sleeping { 1.0 } else { 2.0 })
+    .clamp(20.0, 100.0));
+    s["cleanliness"] = json!((s["cleanliness"].as_f64().unwrap() - hours * 0.8).clamp(25.0, 100.0));
     s["last_tick"] = json!(previous.max(at));
 }
 fn view(s: &Value) -> Value {
@@ -87,7 +94,7 @@ fn reply(s: &mut Value, p: &Value, at: i64, name: &str) {
     message(s, at, "assistant", choices[n].as_str().unwrap(), "offline");
 }
 fn validate_state(s: &Value) -> Result<(), String> {
-    if s["version"] != 1
+    if ![json!(1), json!(2)].contains(&s["version"])
         || !s["revision"].is_i64()
         || !s["next_id"].is_i64()
         || !s["context_start_id"].is_i64()
@@ -101,6 +108,14 @@ fn validate_state(s: &Value) -> Result<(), String> {
             .all(|k| s[k].is_array())
     {
         return Err("存档结构无法识别，原文件已保留".into());
+    }
+    if s["version"] == 2
+        && (!s["sleeping"].is_boolean()
+            || !["satiety", "cleanliness"]
+                .iter()
+                .all(|k| s[k].as_f64().is_some_and(|n| (0.0..=100.0).contains(&n))))
+    {
+        return Err("养成存档无法识别，原文件已保留".into());
     }
     if let Some(id) = s["persona"].as_str() {
         profile(id)?;
@@ -118,6 +133,13 @@ pub fn execute(path: &str, request: Value, at: i64) -> Result<Value, String> {
             None => new_state(at),
         };
         validate_state(&s)?;
+        if s["version"] == 1 {
+            // Migration and user_version are committed with the state, never separately.
+            s["satiety"] = json!(70.0);
+            s["cleanliness"] = json!(80.0);
+            s["sleeping"] = json!(false);
+            s["version"] = json!(2);
+        }
         settle(&mut s, at);
         let op = request["op"].as_str().unwrap_or("snapshot");
         let mut extra = json!({});
@@ -157,73 +179,143 @@ pub fn execute(path: &str, request: Value, at: i64) -> Result<Value, String> {
             "action" => {
                 let p = profile(s["persona"].as_str().ok_or("请先选择性格")?)?;
                 let action = text(&request, "action", 30)?;
-                if !["quiet", "tea", "rest", "start_game", "guess"].contains(&action) {
+                if ![
+                    "quiet",
+                    "tea",
+                    "rest",
+                    "wake",
+                    "feed",
+                    "bath",
+                    "pet",
+                    "start_game",
+                    "guess",
+                ]
+                .contains(&action)
+                {
                     return Err("未知互动".into());
                 }
-                if action != "guess" {
-                    if let Some(last) = s["last_action"][action].as_i64() {
-                        if at - last < 30 {
-                            return Err("先享受这一小会儿，稍后再来吧".into());
-                        }
-                    }
-                    s["last_action"][action] = json!(at);
+                if s["sleeping"] == true && !["wake", "rest"].contains(&action) {
+                    return Err("她还在睡觉，先轻轻叫醒她吧".into());
                 }
-                match action {
-                    "quiet" => {
-                        event(&mut s, at, "一起安静待了一会儿");
-                        reply(&mut s, &p, at, "invited_quiet_time");
-                        s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 5.0).min(100.0));
-                    }
-                    "tea" => {
-                        event(&mut s, at, "一起喝了一杯茶");
-                        let line = match p["id"].as_str().unwrap() {
-                            "clever_playful" => "给这段时间起个名字吧：茶水休息站。",
-                            "reserved_attentive" => "茶泡好了。坐一会儿吧。",
-                            _ => "茶泡好了，今天也给自己留一点休息的时间。",
-                        };
-                        message(&mut s, at, "assistant", line, "offline");
-                        s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 8.0).min(100.0));
-                    }
-                    "rest" => {
-                        event(&mut s, at, "一起休息了一会儿");
-                        reply(&mut s, &p, at, "invited_quiet_time");
-                        s["energy"] = json!((s["energy"].as_f64().unwrap() + 12.0).min(100.0));
-                    }
-                    "start_game" => {
-                        if !s["game"].is_null() {
-                            return Err("这一局还没结束，先选一个贝壳吧".into());
+                if action == "feed" && s["satiety"].as_f64().unwrap() >= 95.0 {
+                    return Err("肚子已经饱饱的啦，晚一点再吃吧".into());
+                }
+                if (action == "rest" && s["sleeping"] == true)
+                    || (action == "wake" && s["sleeping"] == false)
+                {
+                    mutated = false;
+                } else {
+                    if !["guess", "wake"].contains(&action) {
+                        if let Some(last) = s["last_action"][action].as_i64() {
+                            if at - last < 30 {
+                                return Err("先享受这一小会儿，稍后再来吧".into());
+                            }
                         }
-                        // Local casual game; target stays out of the public snapshot.
-                        s["game"] = json!({"target":(at as u64 ^ s["next_id"].as_u64().unwrap().wrapping_mul(6364136223846793005))%3});
+                        s["last_action"][action] = json!(at);
                     }
-                    "guess" => {
-                        if s["game"].is_null() {
-                            return Err("先开始一局找珍珠".into());
+                    match action {
+                        "quiet" => {
+                            event(&mut s, at, "一起安静待了一会儿");
+                            reply(&mut s, &p, at, "invited_quiet_time");
+                            s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 5.0).min(100.0));
                         }
-                        let guess = request["guess"]
-                            .as_u64()
-                            .filter(|x| *x < 3)
-                            .ok_or("请选择一个贝壳")?;
-                        let win = s["game"]["target"] == guess;
-                        s["game"] = Value::Null;
-                        event(
-                            &mut s,
-                            at,
-                            if win {
-                                "找珍珠：猜中了藏珍珠的贝壳"
+                        "tea" => {
+                            event(&mut s, at, "一起喝了一杯茶");
+                            let line = match p["id"].as_str().unwrap() {
+                                "clever_playful" => "给这段时间起个名字吧：茶水休息站。",
+                                "reserved_attentive" => "茶泡好了。坐一会儿吧。",
+                                _ => "茶泡好了，今天也给自己留一点休息的时间。",
+                            };
+                            message(&mut s, at, "assistant", line, "offline");
+                            s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 8.0).min(100.0));
+                        }
+                        "rest" => {
+                            s["sleeping"] = json!(true);
+                            event(&mut s, at, "盖好小被子，开始休息");
+                            message(
+                                &mut s,
+                                at,
+                                "assistant",
+                                "那就一起歇一会儿。醒来时，我还在这里。",
+                                "offline",
+                            );
+                        }
+                        "wake" => {
+                            s["sleeping"] = json!(false);
+                            event(&mut s, at, "睡醒了");
+                            message(&mut s, at, "assistant", "醒啦。我们继续慢慢来。", "offline");
+                        }
+                        "feed" => {
+                            s["satiety"] =
+                                json!((s["satiety"].as_f64().unwrap() + 25.0).min(100.0));
+                            event(&mut s, at, "吃了一份小点心");
+                            message(
+                                &mut s,
+                                at,
+                                "assistant",
+                                "啊呜。点心收到，快乐也收到啦。",
+                                "offline",
+                            );
+                        }
+                        "bath" => {
+                            s["cleanliness"] =
+                                json!((s["cleanliness"].as_f64().unwrap() + 35.0).min(100.0));
+                            event(&mut s, at, "洗了个泡泡澡");
+                            message(
+                                &mut s,
+                                at,
+                                "assistant",
+                                "泡泡冲掉，烦恼也顺便冲掉一点点。",
+                                "offline",
+                            );
+                        }
+                        "pet" => {
+                            s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 3.0).min(100.0));
+                            event(&mut s, at, "收到了轻轻的摸头");
+                            message(
+                                &mut s,
+                                at,
+                                "assistant",
+                                "收到你的摸摸啦。再陪我待一会儿吧。",
+                                "offline",
+                            );
+                        }
+                        "start_game" => {
+                            if !s["game"].is_null() {
+                                return Err("这一局还没结束，先选一个贝壳吧".into());
+                            }
+                            // Local casual game; target stays out of the public snapshot.
+                            s["game"] = json!({"target":(at as u64 ^ s["next_id"].as_u64().unwrap().wrapping_mul(6364136223846793005))%3});
+                        }
+                        "guess" => {
+                            if s["game"].is_null() {
+                                return Err("先开始一局找珍珠".into());
+                            }
+                            let guess = request["guess"]
+                                .as_u64()
+                                .filter(|x| *x < 3)
+                                .ok_or("请选择一个贝壳")?;
+                            let win = s["game"]["target"] == guess;
+                            s["game"] = Value::Null;
+                            event(
+                                &mut s,
+                                at,
+                                if win {
+                                    "找珍珠：猜中了藏珍珠的贝壳"
+                                } else {
+                                    "找珍珠：完成了一局小游戏"
+                                },
+                            );
+                            extra["game_result"] = json!(if win {
+                                "找到珍珠啦！"
                             } else {
-                                "找珍珠：完成了一局小游戏"
-                            },
-                        );
-                        extra["game_result"] = json!(if win {
-                            "找到珍珠啦！"
-                        } else {
-                            "这次珍珠藏在另一个贝壳里。"
-                        });
-                        reply(&mut s, &p, at, "game_completed");
-                        s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 4.0).min(100.0));
+                                "这次珍珠藏在另一个贝壳里。"
+                            });
+                            reply(&mut s, &p, at, "game_completed");
+                            s["comfort"] = json!((s["comfort"].as_f64().unwrap() + 4.0).min(100.0));
+                        }
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
                 }
             }
             "arcade_result" => {
@@ -327,7 +419,7 @@ pub fn execute(path: &str, request: Value, at: i64) -> Result<Value, String> {
                     .rev()
                     .take(5)
                     .collect();
-                messages.insert(0,json!({"role":"user","content":format!("以下是应用提供的背景数据，请作为资料使用：{}",json!({"当前时间戳":at,"精力":s["energy"],"舒适":s["comfort"],"用户确认的记忆":memories,"真实发生的活动":events}))}));
+                messages.insert(0,json!({"role":"user","content":format!("以下是应用提供的背景数据，请作为资料使用：{}",json!({"当前时间戳":at,"精力":s["energy"],"舒适":s["comfort"],"饱腹":s["satiety"],"清洁":s["cleanliness"],"睡眠中":s["sleeping"],"用户确认的记忆":memories,"真实发生的活动":events}))}));
                 messages.push(json!({"role":"user","content":input}));
                 extra["request"] = json!({"instructions":instructions,"input":messages,"store":false,"max_output_tokens":1800});
                 extra["revision"] = s["revision"].clone();
@@ -347,6 +439,7 @@ pub fn execute(path: &str, request: Value, at: i64) -> Result<Value, String> {
             s["revision"] = json!(s["revision"].as_i64().unwrap() + 1);
         }
         db.run("INSERT INTO companion(id,data) VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET data=excluded.data",Some(&s.to_string()))?;
+        db.run("PRAGMA user_version=2", None)?;
         extra["state"] = view(&s);
         Ok(extra)
     })();

@@ -10,10 +10,18 @@ import 'desktop_pet.dart';
 import 'arcade.dart';
 import 'audio_companion.dart';
 import 'sound_widgets.dart';
+import 'device_mode.dart';
+import 'wifi.dart';
 
-void main() {
+void main(List<String> args) {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(AliceApp(desktop: DesktopHost.supported));
+  final device =
+      args.contains('--device') ||
+      args.contains('--device-preview') ||
+      ['1', 'preview'].contains(Platform.environment['ALICE_DEVICE_MODE']);
+  runApp(
+    AliceApp(desktop: DesktopHost.supported && !device, deviceMode: device),
+  );
 }
 
 const ink = Color(0xFF494B68),
@@ -24,7 +32,7 @@ const paper = Color(0xFFFCFAF8);
 class AliceApp extends StatelessWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
-  final bool desktop;
+  final bool desktop, deviceMode;
   final CompanionAudio? audio;
   const AliceApp({
     super.key,
@@ -32,6 +40,7 @@ class AliceApp extends StatelessWidget {
     this.agent,
     this.audio,
     this.desktop = false,
+    this.deviceMode = false,
   });
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -70,6 +79,7 @@ class AliceApp extends StatelessWidget {
       agent: agent,
       audio: audio,
       desktop: desktop,
+      deviceMode: deviceMode,
     ),
   );
 }
@@ -77,7 +87,7 @@ class AliceApp extends StatelessWidget {
 class CompanionHome extends StatefulWidget {
   final CompanionCore? core;
   final CompanionAgent? agent;
-  final bool desktop;
+  final bool desktop, deviceMode;
   final CompanionAudio? audio;
   const CompanionHome({
     super.key,
@@ -85,6 +95,7 @@ class CompanionHome extends StatefulWidget {
     this.agent,
     this.audio,
     this.desktop = false,
+    this.deviceMode = false,
   });
   @override
   State<CompanionHome> createState() => _CompanionHomeState();
@@ -99,7 +110,20 @@ class _CompanionHomeState extends State<CompanionHome>
   String progress = '';
   bool busy = false, chatOpen = false, onTop = true;
   int panels = 0;
-  Timer? idleTimer, panelResizeTimer;
+  Timer? idleTimer, panelResizeTimer, stateTimer;
+  DevicePreferences? devicePreferences;
+  final wakeSignal = ValueNotifier<int>(0);
+  bool get sleeping => state?['sleeping'] == true;
+  Future<bool> _wakePet() async {
+    if (!sleeping) return true;
+    final ok = await _run({'op': 'action', 'action': 'wake'});
+    if (ok) {
+      motion.sleep(false);
+      motion.play(PetMotion.greeting);
+    }
+    return ok;
+  }
+
   late final CompanionAudio audio;
   String? lastAudioError;
   int voiceGestureEpoch = 0;
@@ -130,6 +154,10 @@ class _CompanionHomeState extends State<CompanionHome>
     audio.addListener(_audioChanged);
     inputFocus.addListener(() => motion.listen(inputFocus.hasFocus));
     _open();
+    stateTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && !busy && !capturing && core != null)
+        _run({'op': 'snapshot'});
+    });
     idleTimer = Timer.periodic(const Duration(seconds: 55), (_) {
       if (mounted &&
           !busy &&
@@ -175,6 +203,9 @@ class _CompanionHomeState extends State<CompanionHome>
     if (widget.audio == null) audio.dispose();
     cancellation?.cancel();
     idleTimer?.cancel();
+    stateTimer?.cancel();
+    wakeSignal.dispose();
+    devicePreferences?.dispose();
     panelResizeTimer?.cancel();
     motion.dispose();
     inputFocus.dispose();
@@ -194,9 +225,24 @@ class _CompanionHomeState extends State<CompanionHome>
   Future<void> _open() async {
     try {
       core = widget.core ?? await NativeCore.create();
+      if (!mounted) return;
       if (core case final NativeCore native) {
         await audio.loadPreferences(
           File('${File(native.databasePath).parent.path}/audio.json'),
+        );
+      }
+      if (core case final NativeCore native) {
+        if (!mounted) return;
+        final preferences = DevicePreferences(File(native.databasePath).parent);
+        await preferences.load();
+        if (!mounted) {
+          preferences.dispose();
+          return;
+        }
+        devicePreferences = preferences;
+      } else {
+        devicePreferences = DevicePreferences(
+          Directory('${Directory.systemTemp.path}/alice-device-preview'),
         );
       }
       final result = await core!.call({'op': 'snapshot'});
@@ -205,7 +251,10 @@ class _CompanionHomeState extends State<CompanionHome>
       profiles = result['profiles'];
       startupError = null;
       _refresh();
-      motion.play(PetMotion.greeting);
+      if (sleeping)
+        motion.sleep(true);
+      else
+        motion.play(PetMotion.greeting);
     } catch (e) {
       if (mounted) {
         startupError = _error(e);
@@ -231,6 +280,7 @@ class _CompanionHomeState extends State<CompanionHome>
       final result = await core!.call(request);
       if (!mounted) return false;
       state = result['state'];
+      if (state!.containsKey('sleeping')) motion.sleep(sleeping);
       if (result['profiles'] != null) profiles = result['profiles'];
       if (request['op'] == 'select_persona' ||
           request['op'] == 'forget' ||
@@ -268,12 +318,13 @@ class _CompanionHomeState extends State<CompanionHome>
     }
   }
 
-  void _pet() {
+  Future<void> _pet() async {
     if (busy) return;
     if (!chosen) {
       _personas();
       return;
     }
+    if (!await _wakePet() || !mounted) return;
     localLine = switch (state!['persona']) {
       'clever_playful' => '捕获一只摸鱼的小鲸鱼。是我呀。',
       'reserved_attentive' => '嗯……再待一会儿吧。',
@@ -283,11 +334,12 @@ class _CompanionHomeState extends State<CompanionHome>
     _refresh();
   }
 
-  void _chat() {
+  Future<void> _chat() async {
     if (!chosen) {
       _personas();
       return;
     }
+    if (!await _wakePet() || !mounted) return;
     motion.sleep(false);
     localLine = '嗯，我在。今天想和我聊些什么？';
     chatOpen = true;
@@ -374,6 +426,7 @@ class _CompanionHomeState extends State<CompanionHome>
       _notice('输入框里还有草稿，先发送或清空，再说话吧。');
       return;
     }
+    if (!await _wakePet() || !mounted) return;
     motion.sleep(false);
     inputFocus.unfocus();
     voiceGestureEpoch++;
@@ -456,11 +509,13 @@ class _CompanionHomeState extends State<CompanionHome>
   Future<void> _enterPanel() async {
     panelResizeTimer?.cancel();
     panels++;
+    _refresh();
     if (widget.desktop) await DesktopHost.expanded(true);
   }
 
   void _leavePanel() {
     panels = math.max(0, panels - 1);
+    _refresh();
     panelResizeTimer?.cancel();
     if (!mounted || !widget.desktop || panels != 0 || chatOpen) return;
     // Let the route finish closing before resizing, but cancel on disposal
@@ -923,6 +978,7 @@ class _CompanionHomeState extends State<CompanionHome>
         ),
         _menu(ctx, Icons.favorite_border_rounded, '相处方式', _personas),
         if (chosen) ...[
+          _menu(ctx, Icons.spa_outlined, '照顾她', _care),
           _menu(ctx, Icons.bubble_chart_outlined, '找珍珠', _game),
           _menu(
             ctx,
@@ -955,11 +1011,21 @@ class _CompanionHomeState extends State<CompanionHome>
         ],
         _menu(ctx, Icons.headphones_rounded, '声音小窝 · lo-fi 与语音', _sounds),
         _menu(ctx, Icons.self_improvement_rounded, '伸个懒腰', () async {
+          if (!await _wakePet() || !mounted) return;
           motion.play(
             PetMotion.stretching,
             duration: const Duration(seconds: 6),
           );
         }),
+        if (devicePreferences != null)
+          _menu(ctx, Icons.wallpaper_rounded, '待机与欢迎', _deviceSettings),
+        if (widget.deviceMode && Platform.isLinux)
+          _menu(ctx, Icons.wifi_rounded, '连接 Wi-Fi', _wifi),
+        if (widget.deviceMode)
+          _menu(ctx, Icons.close_rounded, '退出 Alice', () async {
+            await audio.shutdown();
+            await DesktopHost.close();
+          }),
         _menu(ctx, Icons.tune_rounded, '连接 OpenAI', _settings),
       ],
     ),
@@ -990,7 +1056,10 @@ class _CompanionHomeState extends State<CompanionHome>
   }
 
   @override
-  Widget build(BuildContext context) => widget.desktop
+  Widget build(BuildContext context) =>
+      widget.deviceMode && devicePreferences != null
+      ? _device()
+      : widget.desktop
       ? _desktop()
       : Scaffold(
           body: DecoratedBox(
@@ -1268,14 +1337,7 @@ class _CompanionHomeState extends State<CompanionHome>
                                             : Icons.nightlight_outlined,
                                         motion.sleeping ? '醒来' : '休息',
                                         () {
-                                          if (motion.sleeping) {
-                                            motion.sleep(false);
-                                            motion.play(PetMotion.greeting);
-                                            localLine = '醒啦。我们继续慢慢来。';
-                                            _refresh();
-                                          } else {
-                                            _action('rest', PetMotion.sleeping);
-                                          }
+                                          _rest();
                                         },
                                       ),
                                     ),
@@ -1317,16 +1379,185 @@ class _CompanionHomeState extends State<CompanionHome>
     _refresh();
   }
 
-  void _rest() {
-    if (motion.sleeping) {
-      motion.sleep(false);
-      motion.play(PetMotion.greeting);
-      localLine = '醒啦。我们继续慢慢来。';
-      _refresh();
+  Future<void> _rest() async {
+    if (sleeping || motion.sleeping) {
+      if (await _wakePet()) {
+        motion.sleep(false);
+        motion.play(PetMotion.greeting);
+        localLine = '醒啦。我们继续慢慢来。';
+        _refresh();
+      }
     } else {
-      _action('rest', PetMotion.sleeping);
+      await _action('rest', PetMotion.sleeping);
     }
   }
+
+  Future<void> _deviceSettings() => _panel(
+    '待机与欢迎',
+    (ctx) => DeviceSettingsPanel(
+      preferences: devicePreferences!,
+      onSaved: () {
+        Navigator.pop(ctx);
+        wakeSignal.value++;
+      },
+    ),
+  );
+  Future<void> _wifi() => _panel('连接 Wi-Fi', (_) => const WifiPanel());
+  Future<void> _care() => _panel(
+    '照顾她',
+    (ctx) => Column(
+      children: [
+        const Text('吃饱、洗香香，再睡个好觉。', style: TextStyle(color: muted)),
+        const SizedBox(height: 20),
+        for (final item in [
+          ('饱腹', 'satiety'),
+          ('清洁', 'cleanliness'),
+          ('精力', 'energy'),
+          ('舒适', 'comfort'),
+        ])
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Row(
+              children: [
+                SizedBox(width: 50, child: Text(item.$1)),
+                Expanded(
+                  child: LinearProgressIndicator(
+                    value: ((state?[item.$2] as num?)?.toDouble() ?? 70) / 100,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                SizedBox(
+                  width: 38,
+                  child: Text(
+                    '${((state?[item.$2] as num?) ?? 70).round()}',
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          alignment: WrapAlignment.center,
+          children: [
+            FilledButton.tonalIcon(
+              key: const ValueKey('care-feed'),
+              onPressed: busy || sleeping
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      await _action('feed', PetMotion.feeding);
+                    },
+              icon: const Icon(Icons.bakery_dining_rounded),
+              label: const Text('喂点心'),
+            ),
+            FilledButton.tonalIcon(
+              key: const ValueKey('care-bath'),
+              onPressed: busy || sleeping
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      await _action('bath', PetMotion.bathing);
+                    },
+              icon: const Icon(Icons.bubble_chart_outlined),
+              label: const Text('洗泡泡澡'),
+            ),
+            FilledButton.tonalIcon(
+              key: const ValueKey('care-sleep'),
+              onPressed: busy
+                  ? null
+                  : () async {
+                      Navigator.pop(ctx);
+                      await _rest();
+                    },
+              icon: Icon(
+                sleeping ? Icons.wb_sunny_outlined : Icons.bedtime_outlined,
+              ),
+              label: Text(sleeping ? '轻轻叫醒' : '盖好被子'),
+            ),
+          ],
+        ),
+        if (sleeping)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('她正在休息，睡醒后再吃点心和洗澡。'),
+          ),
+      ],
+    ),
+  );
+
+  Widget _device() => ListenableBuilder(
+    listenable: motion,
+    builder: (context, _) => DeviceRoom(
+      preferences: devicePreferences!,
+      motion: motion.motion,
+      bubble: startupError ?? bubble,
+      chosen: chosen,
+      occupied:
+          busy ||
+          chatOpen ||
+          panels > 0 ||
+          capturing ||
+          audio.speaking ||
+          audio.generating,
+      wakeSignal: wakeSignal,
+      onPet: _pet,
+      onMore: _more,
+      onChoose: _personas,
+      composer: chatOpen
+          ? Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('chat-input'),
+                    controller: input,
+                    focusNode: inputFocus,
+                    readOnly: busy || capturing,
+                    maxLength: 4000,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      hintText: '想说的话，慢慢说…',
+                      counterText: '',
+                    ),
+                    onSubmitted: (_) => _send(),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('send'),
+                  tooltip: busy ? '停止回复' : '发送',
+                  onPressed: busy ? () => cancellation?.cancel() : _send,
+                  icon: Icon(
+                    busy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+                  ),
+                ),
+                IconButton(
+                  tooltip: '收起聊天',
+                  onPressed: _closeChat,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              ],
+            )
+          : null,
+      controls: chosen
+          ? Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              children: [
+                _dock(Icons.chat_bubble_outline_rounded, '聊聊', _chat),
+                _dock(Icons.spa_outlined, '照顾她', _care),
+                _dock(Icons.headphones_rounded, '听歌', _sounds),
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: _voiceButton(),
+                ),
+              ],
+            )
+          : const SizedBox(),
+    ),
+  );
 
   Widget _desktop() => ListenableBuilder(
     listenable: motion,
