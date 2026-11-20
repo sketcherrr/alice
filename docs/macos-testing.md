@@ -1,19 +1,19 @@
 # macOS 测试版构建
 
-已交付 0.3.0 可直接运行的 `Alice.app`（包含离线 lo-fi 与按住说话），测试者不需要安装 Xcode、Flutter 或 Rust。
+已交付 0.4.0 可直接运行的 `Alice.app`（包含离线养成、本地音乐导入、lo-fi 与按住说话），测试者不需要安装 Xcode、Flutter 或 Rust。
 
 ## 当前状态
 
-- 2026-11-19 在 GitHub macOS 15 / ARM64 构建机成功生成 Apple Silicon + Intel 通用应用；[构建与测试记录](https://github.com/sketcherrr/alice/actions/runs/44459600513)。
-- 应用对应源码提交 `1e06620f965fbf385d141b73e7832ceb649eeaa9`，使用 Flutter 3.47.9、Xcode 16.4 和 Rust 1.100.0。
-- 已验证双架构、嵌套签名、字体/动画、FFI 导出、沙盒、出站联网和麦克风权限；静态分析无问题，22 项 Flutter 测试通过，实际 Rust/SQLite 与模拟 OpenAI Agent 检查通过。
+- 2026-11-20 在 GitHub macOS 15 / ARM64 构建机成功生成 Apple Silicon + Intel 通用应用；[构建与测试记录](https://github.com/sketcherrr/alice/actions/runs/44687261596)。
+- 应用对应源码提交 `faba4625284c516c901d75d1bc10d95cc6dc6e2a`，使用 Flutter 3.47.9。
+- 已验证双架构、嵌套签名、字体/动画、FFI 导出、沙盒、出站联网、麦克风及用户所选文件只读权限；静态分析无问题，26 项 Flutter 测试与 11 项 Rust 测试通过，实际 Rust/SQLite 与模拟 OpenAI Agent 检查通过。
 - 已下载并再次核对附件哈希、应用压缩包完整性、五个二进制（含 objective_c 音频依赖）的架构切片与 framework 符号链接。桌面人工体验、Intel 真机与最低系统版本仍待测试；未调用真实 OpenAI API。
-- [下载测试附件](https://github.com/sketcherrr/alice/actions/runs/44459600513/artifacts/14499701732)，需登录 GitHub，保留至 2026-12-03。附件内包含应用压缩包及 SHA-256 文件；本地副本位于 `dist/`。
+- [下载测试附件](https://github.com/sketcherrr/alice/actions/runs/44687261596/artifacts/14607007955)，需登录 GitHub，保留至 2026-12-04。附件内包含应用压缩包及 SHA-256 文件；本地副本位于 `dist/`。
 
 `Alice-macOS-universal-test.zip` 的 SHA-256：
 
 ```text
-465ba33026febba4fad308d0e7ac7b7f2c4749733c3ce08001f3168abe26a67d
+ea8be087e3ed6be1e206b8e130a6bf0cee60409aec863e903226490d3d27f959
 ```
 
 旧的 `dist/Alice-macOS-build-input.zip` 只是源码与素材输入，不能作为应用安装。
@@ -59,3 +59,5 @@
 存档通过 Foundation 的 Application Support 定位，在 App Sandbox 的容器内创建 Alice 目录；不写入 `.app` 内。Finder 启动不依赖终端的当前目录。
 
 参考：[Flutter 的 macOS 环境要求](https://docs.flutter.dev/platform-integration/macos/setup)、[macOS 发布](https://docs.flutter.dev/deployment/macos)、[Apple 出站联网权限](https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.security.network.client)、[GitHub 托管 runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)。
+
+0.4 新增人工测试项：导入／移除本地音乐、定时暂停、喂食／洗澡、睡眠跨重启恢复。首次打开前建议备份整个 Alice 数据目录；schema 2 存档无法由 0.3 打开。原生全屏设备窗口及配网入口目前仅在 Linux 接入。

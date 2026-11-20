@@ -114,3 +114,7 @@ dart scripts/check-agent.dart
 - 自启动安装／移除及正常退出在临时目录中验证，未修改当前桌面的启动项。
 - 标准 Flutter 测试命令在本环境无法监听 127.0.0.1，测试套件未在本机执行完成；不能将引擎检查冒充完整套件通过。
 - 未操作当前系统的 Wi-Fi；未进行真实音频输出、5GHz 连接、ARM64／树莓派或 iPhone 测试。
+
+最终云端验证：[macOS CI](https://github.com/sketcherrr/alice/actions/runs/44687261596)（源码 `faba4625284c516c901d75d1bc10d95cc6dc6e2a`）通过完整 **26 项 Flutter 测试、11 项 Rust 测试**及静态分析；[Windows CI](https://github.com/sketcherrr/alice/actions/runs/44687261574) release 编译通过。待机测试的真实异步文件 I/O 与模拟时钟冲突已修正，没有跳过测试。实际 macOS dylib 的离线协议／Agent 检查通过，应用签名及用户所选文件只读权限检查通过。
+
+已取回并核对 0.4.0（build 4）Mac 测试应用：44,624,744 字节；附件摘要、ZIP CRC、五个二进制的 arm64/x86_64 切片、9 个符号链接、内置音乐与角色资源一致性检查通过。应用 SHA-256：`ea8be087e3ed6be1e206b8e130a6bf0cee60409aec863e903226490d3d27f959`。Linux x64 预览包在 `dist/Alice-linux-x64-device-test.tar.gz`，SHA-256：`2d84b60c7281e547c31c2f1f6a6f93966d9362487427d7119d7b2fe23bd747e6`。

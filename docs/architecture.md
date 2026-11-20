@@ -33,8 +33,8 @@ SQLite 通过一个小型 C ABI 封装使用系统 SQLite 库。所有状态修�
 |---|---|
 | Linux x64 | 编译完成，Rust/FFI/引擎内交互检查；桌面显示服务器会话另行验证 |
 | Linux ARM64 / 树莓派 | 架构兼容目标；仍需目标机器构建和显示/输入真机验证 |
-| macOS | 已在 ARM64 macOS CI 生成双架构测试应用，验证 dylib/资源/签名/权限，静态分析及 22 项 Flutter 测试通过；Intel 真机和桌面人工体验待验证 |
-| Windows | Flutter 平台工程已生成；待原生库构建、资源打包、签名和测试 |
+| macOS | 已在 ARM64 macOS CI 生成双架构测试应用，验证 dylib/资源/签名/权限，静态分析及 26 项 Flutter 测试通过；Intel 真机和桌面人工体验待验证 |
+| Windows | release 编译通过；待原生核心运行库打包、签名和真机测试 |
 | Android / iOS | Flutter 平台工程已生成；待移动端沙盒目录、静态/动态库集成、权限与生命周期适配 |
 
 桌面透明角色模式与三种小游戏已接入，操作见 [desktop-and-arcade.md](desktop-and-arcade.md)。当前没有托盘、自动更新、账号同步或视觉。优先完成桌面安装包和树莓派全屏真机验证，再扩展连续语音和其他平台。
