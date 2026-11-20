@@ -84,7 +84,7 @@ void main() {
   testWidgets(
     'device standby wakes with one touch and does not obscure an open panel',
     (tester) async {
-      final temp = await Directory.systemTemp.createTemp('alice-device-test-');
+      final temp = Directory.systemTemp.createTempSync('alice-device-test-');
       final prefs = DevicePreferences(temp)..idleSeconds = 30;
       final signal = ValueNotifier(0);
       Widget room(bool occupied) => MaterialApp(
@@ -113,7 +113,7 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       prefs.dispose();
       signal.dispose();
-      await temp.delete(recursive: true);
+      temp.deleteSync(recursive: true);
     },
   );
   testWidgets(
