@@ -343,9 +343,10 @@ void main() {
       await a.setMusicLevel(.6);
       a.setStyle(VoiceStyle.quiet);
       a.setAutoSpeak(false);
-      await tick();
       a.dispose();
-      await tick();
+      // dispose starts shutdown asynchronously; wait for its queued preference
+      // writes before simulating a restart, independent of filesystem speed.
+      await a.shutdown();
       final b = CompanionAudio(device: FakeAudioDevice());
       addTearDown(b.dispose);
       await b.loadPreferences(file);
