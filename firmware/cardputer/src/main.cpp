@@ -18,7 +18,7 @@ QueueHandle_t commands = nullptr, events = nullptr;
 Preferences preferences;
 M5Canvas canvas(&M5Cardputer.Display);
 bool setupMode = false, connected = false, busy = false, choosePersona = true;
-bool sleeping = false, playing = false, hasState = false;
+bool sleeping = false, playing = false, hasState = false, selectingPersona = false;
 int energy = 0, comfort = 0, satiety = 0, cleanliness = 0;
 String notice = "Connecting...";
 uint32_t lastDraw = 0, effectUntil = 0, lastSnapshot = 0;
@@ -111,7 +111,7 @@ bool exchange(ssh_session session, ssh_channel channel, const Command &command, 
         if (buffer[i] == '\n') {
           if (i != count - 1) return false;
           JsonDocument response;
-          if (deserializeJson(response, reply) || response["v"] != 1 ||
+          if (deserializeJson(response, reply) || response["v"].as<int>() != 1 ||
               !response["id"].is<uint32_t>() || response["id"].as<uint32_t>() != id ||
               !response["ok"].is<bool>()) return false;
           return true;
@@ -203,7 +203,11 @@ void send(const char *op, const char *action = "", int choice = 0) {
   strlcpy(command.op, op, sizeof(command.op));
   strlcpy(command.action, action, sizeof(command.action));
   command.choice = choice;
-  if (xQueueSend(commands, &command, 0) == pdTRUE) { busy = true; lastSnapshot = millis(); }
+  if (xQueueSend(commands, &command, 0) == pdTRUE) {
+    busy = true;
+    selectingPersona = !strcmp(op, "persona");
+    lastSnapshot = millis();
+  }
 }
 
 void meter(const char *label, int value, int y, uint16_t color) {
@@ -333,18 +337,19 @@ void loop() {
         JsonDocument response;
         if (!deserializeJson(response, event.body)) {
           if (response["state"].is<JsonObject>()) {
-            auto state = response["state"];
+            JsonObjectConst state = response["state"].as<JsonObjectConst>();
             sleeping = state["sleeping"] | false;
-            playing = state["game"] == "playing";
+            playing = !strcmp(state["game"] | "idle", "playing");
             energy = state["energy"] | 0;
             comfort = state["comfort"] | 0;
             satiety = state["satiety"] | 0;
             cleanliness = state["cleanliness"] | 0;
-            if (!hasState || response["ok"] == true) choosePersona = state["persona"].isNull();
+            if (!hasState || state["persona"].isNull() || (response["ok"].as<bool>() && selectingPersona))
+              choosePersona = state["persona"].isNull();
             hasState = true;
           }
           notice = response["message"].as<String>();
-          if (response["ok"] == true && effect) effectUntil = millis() + 2500;
+          if (response["ok"].as<bool>() && effect) effectUntil = millis() + 2500;
           else effectUntil = 0;
         }
       } else notice = event.body;
