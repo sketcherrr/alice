@@ -175,6 +175,10 @@ python scripts/test-cardputer.py
 pio run -d firmware/cardputer
 ```
 
-GitHub Actions 的 `Cardputer SSH prototype` 工作流检查主机测试和固件交叉编译。交叉编译通过也不能代替真机上的内存、无线、按键与 SSH 联调。测试结果会随本轮完成情况更新。
+2026-11-25 验证结果：15 项 Rust 测试、5 项 Python 跨进程／配置测试通过，Arch x64 主机程序构建通过，PlatformIO 的 ESP32-S3 固件交叉编译通过。[对应 CI 记录](https://github.com/sketcherrr/alice/actions/runs/45543536076)；源码提交 `782ef4c0ad2ac0254868658dfa7bd573fdef86b6`。
+
+固件报告 Flash 使用 1,117,165 字节，静态 RAM 使用 50,548 字节；静态数字不包含 Wi-Fi、SSH、画布与任务栈的运行时分配，仍需真机验证峰值内存。上游 SSH 库有 const/deprecated 编译警告，本项目构建无错误。尚未在真实 Cardputer 上验证屏幕、按键、无线与 SSH 登录；当前开发环境不允许监听端口，因此也没有把本地进程测试当成 SSH 网络测试。
+
+[测试固件构建产物](https://github.com/sketcherrr/alice/actions/runs/45543536076/artifacts/14990342683) 包含 `firmware.bin`、`bootloader.bin` 和 `partitions.bin`，它不是写入地址 0 的单一合并镜像。首轮请按上面的 **PlatformIO upload** 步骤上传，让工具处理启动、分区和应用地址；不要把单独的 `firmware.bin` 写到 0。GitHub 下载构建产物通常需要登录，产物会过期，源码仍可自行构建。
 
 依赖与配置参考：[M5Cardputer](https://github.com/m5stack/M5Cardputer)、[LibSSH-ESP32](https://github.com/ewpa/LibSSH-ESP32)、[PlatformIO StampS3](https://docs.platformio.org/en/stable/boards/espressif32/m5stack-stamps3.html)、[OpenSSH sshd_config](https://man.openbsd.org/sshd_config)。固件链接 SSH 库时需遵守其 LGPL 等上游许可；仓库保留源码与构建配置，分发固件时应一起提供对应源码和许可材料。
