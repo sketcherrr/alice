@@ -2,8 +2,64 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:alice_companion/openai.dart';
+import 'package:alice_companion/openai_network.dart';
 
 void main() {
+  test(
+    'default transport really sends through the resolved system HTTP proxy',
+    () async {
+      final proxy = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final previous = OpenAiNetwork.systemProxy;
+      addTearDown(() {
+        OpenAiNetwork.systemProxy = previous;
+        return proxy.close(force: true);
+      });
+      OpenAiNetwork.systemProxy = (_) async => {
+        'kind': 'http',
+        'host': '127.0.0.1',
+        'port': proxy.port,
+      };
+      final served = proxy.first.then((request) async {
+        expect(request.uri.path, '/v1/responses');
+        expect(request.headers.value('authorization'), 'Bearer test-only');
+        await request.drain<void>();
+        request.response.write(
+          '{"status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"via proxy"}]}]}',
+        );
+        await request.response.close();
+      });
+      // Port 1 has no target server. Success is possible only through the proxy.
+      final reply =
+          await OpenAiChat(
+            endpoint: Uri.parse('http://127.0.0.1:1/v1/responses'),
+          ).send(
+            key: 'test-only',
+            model: 'test-model',
+            request: {'input': 'hello'},
+          );
+      expect(reply, 'via proxy');
+      await served;
+    },
+  );
+  test(
+    'connection probe reads model metadata without generating a conversation',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final served = server.first.then((request) async {
+        expect(request.method, 'GET');
+        expect(request.uri.path, '/v1/models/gpt-6-astra');
+        expect(await utf8.decoder.bind(request).join(), isEmpty);
+        request.response.write('{"id":"gpt-6-astra"}');
+        await request.response.close();
+      });
+      final report = await OpenAiChat(
+        endpoint: Uri.parse('http://127.0.0.1:${server.port}/v1/responses'),
+      ).checkConnection(key: 'test-only', model: 'gpt-6-astra');
+      expect(report, contains('未生成回复'));
+      await served;
+    },
+  );
   test(
     'Responses request uses bearer auth, store=false, and parses typed assistant items',
     () async {

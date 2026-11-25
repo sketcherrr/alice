@@ -6,6 +6,8 @@ import 'agent.dart';
 import 'character_animation.dart';
 import 'core.dart';
 import 'openai.dart';
+import 'openai_network.dart';
+import 'connection_dialog.dart';
 import 'desktop_pet.dart';
 import 'arcade.dart';
 import 'audio_companion.dart';
@@ -15,6 +17,7 @@ import 'wifi.dart';
 
 void main(List<String> args) {
   WidgetsFlutterBinding.ensureInitialized();
+  DesktopHost.installNetworkResolver();
   final device =
       args.contains('--device') ||
       args.contains('--device-preview') ||
@@ -106,7 +109,7 @@ class _CompanionHomeState extends State<CompanionHome>
   CompanionCore? core;
   Map<String, dynamic>? state;
   List<dynamic> profiles = [];
-  String? startupError, localLine;
+  String? startupError, localLine, lastChatError;
   String progress = '';
   bool busy = false, chatOpen = false, onTop = true;
   int panels = 0;
@@ -264,11 +267,17 @@ class _CompanionHomeState extends State<CompanionHome>
   }
 
   String _error(Object e) => e.toString().replaceFirst('Bad state: ', '');
-  void _notice(String text) {
+  void _notice(String text, {bool connectionDetails = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(text),
+        behavior: SnackBarBehavior.floating,
+        action: connectionDetails
+            ? SnackBarAction(label: '查看详情', onPressed: _settings)
+            : null,
+      ),
     );
   }
 
@@ -382,6 +391,7 @@ class _CompanionHomeState extends State<CompanionHome>
       );
       if (!mounted) return;
       state = result.state;
+      lastChatError = null;
       input.clear();
       proposals.addAll(
         result.memoryProposals.where((s) => !proposals.contains(s)),
@@ -400,7 +410,8 @@ class _CompanionHomeState extends State<CompanionHome>
         }
       }
     } catch (e) {
-      _notice(_error(e));
+      lastChatError = _error(e);
+      _notice(lastChatError!, connectionDetails: true);
     } finally {
       if (mounted) {
         busy = false;
@@ -730,13 +741,18 @@ class _CompanionHomeState extends State<CompanionHome>
     if (!mounted) return;
     final saved = await showDialog<ConnectionSettings>(
       context: context,
-      builder: (_) =>
-          ConnectionDialog(initialKey: keyValue, initialModel: model),
+      builder: (_) => ConnectionDialog(
+        initialKey: keyValue,
+        initialModel: model,
+        initialNetwork: OpenAiNetwork.settings,
+        initialError: lastChatError,
+      ),
     );
     _leavePanel();
     if (saved != null && mounted) {
       keyValue = saved.key;
       model = saved.model;
+      OpenAiNetwork.settings = saved.network;
       _refresh();
     }
   }
@@ -1671,113 +1687,6 @@ class _CompanionHomeState extends State<CompanionHome>
       ),
       const SizedBox(height: 5),
       Text(title, style: const TextStyle(fontSize: 12, color: muted)),
-    ],
-  );
-}
-
-class ConnectionSettings {
-  final String key, model;
-  const ConnectionSettings(this.key, this.model);
-}
-
-/// Controllers belong to the dialog's lifecycle, including its closing animation.
-class ConnectionDialog extends StatefulWidget {
-  final String initialKey, initialModel;
-  const ConnectionDialog({
-    super.key,
-    required this.initialKey,
-    required this.initialModel,
-  });
-  @override
-  State<ConnectionDialog> createState() => _ConnectionDialogState();
-}
-
-class _ConnectionDialogState extends State<ConnectionDialog> {
-  late final keyInput = TextEditingController(text: widget.initialKey);
-  late final modelInput = TextEditingController(text: widget.initialModel);
-  String? error;
-  @override
-  void dispose() {
-    keyInput.dispose();
-    modelInput.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('连接 OpenAI'),
-    content: SizedBox(
-      width: 360,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '填入你自己的 Key，就能和 Alice 聊天、说话。',
-              style: TextStyle(color: muted, height: 1.8),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              key: const ValueKey('api-key'),
-              controller: keyInput,
-              obscureText: true,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: const InputDecoration(
-                labelText: 'OpenAI API Key',
-                hintText: 'sk-… 或 sk-proj-…',
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              key: const ValueKey('api-model'),
-              controller: modelInput,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: '聊天模型 ID',
-                hintText: '填写你的账号可用的模型',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Key 仅用于本次启动，不写入存档。聊天使用 Responses 接口，发送当前人设、相关记忆和近期对话。\n\n语音会另行使用录音识别与声音生成接口；自动朗读和音色可在「声音小窝」调整。',
-              style: TextStyle(fontSize: 12, color: muted, height: 1.7),
-            ),
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  error!,
-                  style: const TextStyle(color: Colors.redAccent),
-                ),
-              ),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('稍后再说'),
-      ),
-      FilledButton.tonal(
-        onPressed: () {
-          final key = keyInput.text.trim(), model = modelInput.text.trim();
-          if (key.isNotEmpty &&
-              (key.contains(RegExp(r'\s')) ||
-                  key.toLowerCase().startsWith('bearer'))) {
-            setState(() => error = '粘贴 Key 本身即可，不要添加 Bearer 或空格。');
-            return;
-          }
-          if (key.isNotEmpty && model.isEmpty) {
-            setState(() => error = '还需要填写可用的模型 ID。');
-            return;
-          }
-          Navigator.pop(context, ConnectionSettings(key, model));
-        },
-        child: const Text('保存设置'),
-      ),
     ],
   );
 }

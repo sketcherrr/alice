@@ -5,6 +5,8 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'openai.dart';
+import 'openai_network.dart';
+import 'api_failure.dart';
 
 enum VoiceStyle {
   sweet('轻甜', 'coral', 'Light, warm and gently playful, with a soft smile.'),
@@ -73,6 +75,8 @@ class _IoVoiceSocket implements VoiceSocket {
 
     token.add(abort);
     try {
+      await OpenAiNetwork.configure(client, uri.replace(scheme: 'https'));
+      token.check();
       final request = await client.getUrl(uri.replace(scheme: 'https'));
       request.followRedirects = false;
       final nonce = base64Encode(
@@ -97,7 +101,7 @@ class _IoVoiceSocket implements VoiceSocket {
             .bytes,
       );
       if (response.statusCode != 101)
-        throw VoiceFailure(OpenAiVoice.statusMessage(response.statusCode));
+        throw VoiceFailure(await apiFailure(response, key));
       if (response.headers.value('sec-websocket-accept') != accept ||
           response.headers.value('upgrade')?.toLowerCase() != 'websocket') {
         throw const VoiceFailure('语音连接校验未通过。');
@@ -121,6 +125,7 @@ class OpenAiVoice {
   static const transcriptionModel = 'gpt-transcribe';
   static const speechModel = 'gpt-realtime-2.1-mini';
   final HttpClient Function() clientFactory;
+  final bool _configureNetwork;
   final VoiceConnector connector;
   final Duration timeout;
   OpenAiVoice({
@@ -128,6 +133,7 @@ class OpenAiVoice {
     VoiceConnector? connector,
     this.timeout = const Duration(seconds: 90),
   }) : clientFactory = clientFactory ?? HttpClient.new,
+       _configureNetwork = clientFactory == null,
        connector = connector ?? _IoVoiceSocket.connect;
 
   static void validateKey(String key) {
@@ -161,6 +167,13 @@ class OpenAiVoice {
     cancellation.add(abort);
     try {
       return await (() async {
+        if (_configureNetwork) {
+          await OpenAiNetwork.configure(
+            client,
+            Uri.parse('https://api.openai.com/v1/audio/transcriptions'),
+          );
+        }
+        cancellation.check();
         final boundary = 'alice-${DateTime.now().microsecondsSinceEpoch}';
         final req = await client.postUrl(
           Uri.parse('https://api.openai.com/v1/audio/transcriptions'),
@@ -185,7 +198,7 @@ class OpenAiVoice {
         cancellation.check();
         final response = await req.close();
         if (response.statusCode != 200)
-          throw VoiceFailure(statusMessage(response.statusCode));
+          throw VoiceFailure(await apiFailure(response, key.trim()));
         final bytes = <int>[];
         await for (final chunk in response) {
           cancellation.check();
@@ -204,6 +217,9 @@ class OpenAiVoice {
       })().timeout(timeout);
     } on VoiceFailure {
       rethrow;
+    } on NetworkFailure catch (e) {
+      cancellation.check();
+      throw VoiceFailure(e.message);
     } catch (_) {
       cancellation.check();
       throw const VoiceFailure('暂时没能识别语音，请检查网络后重试；也可以打字。');
@@ -320,9 +336,12 @@ class OpenAiVoice {
       })().timeout(timeout);
     } on VoiceFailure {
       rethrow;
+    } on NetworkFailure catch (e) {
+      cancellation.check();
+      throw VoiceFailure(e.message);
     } catch (_) {
       cancellation.check();
-      throw const VoiceFailure('暂时无法生成语音，文字回复已保留。');
+      throw const VoiceFailure('暂时无法生成语音，请检查连接设置中的代理；文字回复已保留。');
     } finally {
       cancellation.remove(abort);
       abort();

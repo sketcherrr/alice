@@ -37,6 +37,7 @@ trap 'rm -rf "$alice_stage"' EXIT
 export ALICE_CORE_LIBRARY="$alice_stage/Alice.app/Contents/Frameworks/libalice_core.dylib"
 dart scripts/check-offline.dart
 dart scripts/check-agent.dart
+dart scripts/check-network.dart
 /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$alice_stage/Alice.app" "$alice_stage/Alice-macOS-universal-test.zip"
 cp "$alice_stage/Alice-macOS-universal-test.zip" "$alice_root/dist/Alice-macOS-universal-test.zip"
 (

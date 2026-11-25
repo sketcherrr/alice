@@ -1,8 +1,10 @@
 import Cocoa
 import FlutterMacOS
+import CFNetwork
 
 class MainFlutterWindow: NSWindow {
   private var desktopChannel: FlutterMethodChannel?
+  private var networkChannel: FlutterMethodChannel?
   override var canBecomeKey: Bool { true }
   override var canBecomeMain: Bool { true }
 
@@ -26,6 +28,38 @@ class MainFlutterWindow: NSWindow {
     self.center()
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    networkChannel = FlutterMethodChannel(name: "alice/network", binaryMessenger: flutterViewController.engine.binaryMessenger)
+    networkChannel?.setMethodCallHandler { call, result in
+      guard call.method == "proxyForUrl" else { result(FlutterMethodNotImplemented); return }
+      guard let address = call.arguments as? String,
+            let url = URL(string: address), url.scheme == "https", url.host == "api.openai.com" else {
+        result(FlutterError(code: "invalid_url", message: "Invalid API URL", details: nil)); return
+      }
+      guard let settings = CFNetworkCopySystemProxySettings()?.takeRetainedValue() else {
+        result(FlutterError(code: "proxy_settings", message: "Cannot read proxy settings", details: nil)); return
+      }
+      let proxies = CFNetworkCopyProxiesForURL(url as CFURL, settings).takeRetainedValue() as NSArray
+      guard let proxy = proxies.firstObject as? [String: Any],
+            let type = proxy[kCFProxyTypeKey as String] as? String else {
+        result(["kind": "direct"]); return
+      }
+      switch type {
+      case kCFProxyTypeNone as String:
+        result(["kind": "direct"])
+      case kCFProxyTypeHTTP as String, kCFProxyTypeHTTPS as String:
+        guard let host = proxy[kCFProxyHostNameKey as String] as? String,
+              let port = proxy[kCFProxyPortNumberKey as String] as? NSNumber else {
+          result(FlutterError(code: "proxy_address", message: "Invalid proxy address", details: nil)); return
+        }
+        result(["kind": "http", "host": host, "port": port.intValue])
+      case kCFProxyTypeAutoConfigurationURL as String, kCFProxyTypeAutoConfigurationJavaScript as String:
+        result(["kind": "pac"])
+      case kCFProxyTypeSOCKS as String:
+        result(["kind": "socks"])
+      default:
+        result(["kind": "unsupported"])
+      }
+    }
     desktopChannel = FlutterMethodChannel(name: "alice/desktop", binaryMessenger: flutterViewController.engine.binaryMessenger)
     desktopChannel?.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { result(nil); return }

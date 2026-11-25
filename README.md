@@ -4,7 +4,7 @@
 
 **[去小小鲸屿坐坐 →](https://sketcherrr.github.io/alice/)** · 项目介绍、角色互动预览与下载入口。网页源码位于 [website/](website/README.md)，由 GitHub Pages 自动发布。
 
-当前源码为 **0.4.0 设备模式预览版**，新增树莓派全屏布局、待机与欢迎、离线养成、音乐导入及双频配网。ARM64 构建和真实树莓派连接仍待验证。下方 Mac 下载入口已更新为通过完整测试的 0.4 测试包。
+当前源码为 **0.4.1 连接修复版**，新增 macOS 系统 HTTP(S) 代理读取、手动 HTTP 代理、模型连接检查与可保留的错误详情。包含 0.4 的树莓派全屏布局、待机与欢迎、离线养成、音乐导入及双频配网。ARM64 构建和真实树莓派连接仍待验证。
 
 当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、26 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
 
@@ -50,6 +50,12 @@
 也支持从启动环境读取 `OPENAI_API_KEY` 与 `OPENAI_MODEL`，本项目不会自动读取 `.env` 文件。不要把密钥写进代码、截图或版本库。默认不内置模型 ID，避免将某个账号无权使用或已下线的型号固定在产品里。
 
 请求发送至 `https://api.openai.com/v1/responses`，带有当前性格、相关记忆、近期活动和最近对话。设置 `store: false` 表示不使用 Responses 持久会话功能，不代表供应商完全不保留请求数据。当前为非流式文字回复，不会自动重试收费请求。
+
+**Mac 浏览器能访问、Alice 连接失败时**：旧版从 Finder 启动时可能没有终端中的代理环境变量。0.4.1 的「自动」连接方式会优先使用代理环境变量，随后读取 macOS 对该 API 地址的系统 HTTP(S) 代理配置；文字聊天、录音识别与语音回复共用此设置。若使用 PAC 或 SOCKS，当前会明确提示改选「手动 HTTP 代理」，填写代理软件实际的 HTTP／混合端口，例如 `http://127.0.0.1:7890`；示例端口不一定是你的端口。不会关闭 TLS 证书校验，也不会在配置不可用时偷偷绕过代理。
+
+填写 Key 和模型 ID 后可点「检查连接」：它只调用 `GET /v1/models/{model}` 读取模型信息，不发送聊天、记忆或录音，不生成回复。检查成功说明网络和模型读取已通，不保证聊天端点权限或生成额度；受限 Key 也可能允许聊天而禁止读取模型。错误会显示 HTTP 状态、可识别的错误码和经过筛选的 Request ID，区分 `insufficient_quota`、`rate_limit_exceeded`、`model_not_found`、TLS/网络失败。原始服务器错误文本不显示，以免回显 Key 或私密输入。上一次聊天失败的详情可再次打开「连接 OpenAI」查看。
+
+Key 与手动代理设置都只保留在本次启动内；更换 Key 不会自动发起连接检查。参见 [OpenAI 错误码](https://developers.openai.com/api/docs/guides/error-codes) 与 [模型读取接口](https://developers.openai.com/api/reference/resources/models/methods/retrieve)。
 
 资料参考：[Responses API 官方说明](https://developers.openai.com/api/docs/guides/migrate-to-responses)。
 

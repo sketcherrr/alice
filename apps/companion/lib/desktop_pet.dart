@@ -3,9 +3,17 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'openai_network.dart';
 
 class DesktopHost {
   static const channel = MethodChannel('alice/desktop');
+  static void installNetworkResolver() {
+    if (!Platform.isMacOS) return;
+    const network = MethodChannel('alice/network');
+    OpenAiNetwork.systemProxy = (uri) =>
+        network.invokeMapMethod<String, dynamic>('proxyForUrl', uri.toString());
+  }
+
   static bool get supported =>
       Platform.isMacOS || Platform.isLinux || Platform.isWindows;
   static Future<void> call(String method, [Object? arguments]) async {
