@@ -1,0 +1,9 @@
+{
+  "wifi_ssid": "YOUR_2.4_GHZ_WIFI",
+  "wifi_password": "YOUR_WIFI_PASSWORD",
+  "ssh_host": "192.168.1.100",
+  "ssh_port": 2222,
+  "ssh_user": "alice-card",
+  "ssh_password": "YOUR_DEDICATED_ACCOUNT_PASSWORD",
+  "host_fingerprint": "SHA256:REPLACE_WITH_THE_HOST_ED25519_FINGERPRINT"
+}

@@ -24,6 +24,8 @@
 
 ## 在 Linux 上启动
 
+**Cardputer-Adv 首轮测试**：新增 PlatformIO 小屏固件，通过 SSH 使用 Arch 主机上的 Rust／SQLite 核心。包含喂食、洗澡、睡眠、摸头、找珍珠与断线后恢复；安装、配网和上传步骤见 [Cardputer 测试指南](docs/cardputer.md)。设备本身只支持 2.4 GHz Wi-Fi；这个客户端尚未移植在线聊天、语音和独立离线养成。
+
 如果已有构建产物：
 
 ```bash

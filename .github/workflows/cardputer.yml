@@ -1,0 +1,44 @@
+name: Cardputer SSH prototype
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'firmware/cardputer/**'
+      - 'crates/pet_core/**'
+      - 'scripts/*cardputer*'
+      - '.github/workflows/cardputer.yml'
+  pull_request:
+    paths:
+      - 'firmware/cardputer/**'
+      - 'crates/pet_core/**'
+      - 'scripts/*cardputer*'
+      - '.github/workflows/cardputer.yml'
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked
+      - run: bash scripts/build-cardputer-host.sh
+      - run: python3 scripts/test-cardputer.py
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install platformio==6.1.19
+      - run: pio run -d firmware/cardputer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Alice-Cardputer-Adv-SSH-test
+          path: |
+            firmware/cardputer/.pio/build/cardputer-adv/firmware.bin
+            firmware/cardputer/.pio/build/cardputer-adv/bootloader.bin
+            firmware/cardputer/.pio/build/cardputer-adv/partitions.bin
+          if-no-files-found: error

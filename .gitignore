@@ -17,3 +17,7 @@
 
 
 /dist/
+__pycache__/
+**/.pio/
+**/.venv/
+/firmware/cardputer/*.local.json
