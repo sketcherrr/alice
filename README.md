@@ -6,7 +6,7 @@
 
 当前源码为 **0.4.1 连接修复版**，新增 macOS 系统 HTTP(S) 代理读取、手动 HTTP 代理、模型连接检查与可保留的错误详情。包含 0.4 的树莓派全屏布局、待机与欢迎、离线养成、音乐导入及双频配网。ARM64 构建和真实树莓派连接仍待验证。
 
-当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；静态分析、26 项 Flutter 测试及实际 Rust/SQLite 检查通过。Mac 桌面人工体验仍待测试。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
+当前完成 Linux 桌面原型，并已在 macOS CI 构建出 Apple Silicon + Intel 通用测试应用；0.4.1 的静态分析、30 项 Flutter 测试、15 项 Rust 测试及实际 Rust/SQLite 检查通过。用户已确认旧版 Mac 基础功能正常；新版代理连接、真实 API 与语音仍待真机验证。Windows、Android、iOS 已有 Flutter 平台工程，原生库打包、移动端数据目录及真机验证尚未完成；不能把这些工程视为已发布的平台版本。
 
 ## 现在可以做什么
 
@@ -108,7 +108,7 @@ dart scripts/check-agent.dart
 
 已生成包含 Apple Silicon 和 Intel 架构的 `Alice.app`，测试者无需开发环境。
 
-[下载 macOS 测试包](https://github.com/sketcherrr/alice/actions/runs/44687261596/artifacts/14607007955)（需登录 GitHub，附件保留至 2026-12-04）。解压下载附件，再解压其中的 `Alice-macOS-universal-test.zip`，将 `Alice.app` 拖入“应用程序”。本地已取回同名应用压缩包，位于 `dist/`。
+[下载 macOS 0.4.1 连接修复测试包](https://github.com/sketcherrr/alice/actions/runs/45602983312/artifacts/15017550354)（需登录 GitHub，附件保留至 2026-12-09）。解压下载附件，再解压其中的 `Alice-macOS-universal-test.zip`，退出旧版后将 `Alice.app` 拖入“应用程序”并替换。本地已取回同名应用压缩包并核对 SHA-256，位于 `dist/`。
 
 测试版使用临时签名，尚未通过 Apple 公证；首次打开被系统阻止时，可前往“系统设置 → 隐私与安全性”允许打开。构建脚本为 `scripts/build-macos.sh`，自动构建流程为 `.github/workflows/macos-test.yml`；后续相关代码提交会自动生成新测试包。
 
