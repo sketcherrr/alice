@@ -43,20 +43,19 @@ class MainFlutterWindow: NSWindow {
             let type = proxy[kCFProxyTypeKey as String] as? String else {
         result(["kind": "direct"]); return
       }
-      switch type {
-      case kCFProxyTypeNone as String:
+      if type == (kCFProxyTypeNone as String) {
         result(["kind": "direct"])
-      case kCFProxyTypeHTTP as String, kCFProxyTypeHTTPS as String:
+      } else if type == (kCFProxyTypeHTTP as String) || type == (kCFProxyTypeHTTPS as String) {
         guard let host = proxy[kCFProxyHostNameKey as String] as? String,
               let port = proxy[kCFProxyPortNumberKey as String] as? NSNumber else {
           result(FlutterError(code: "proxy_address", message: "Invalid proxy address", details: nil)); return
         }
         result(["kind": "http", "host": host, "port": port.intValue])
-      case kCFProxyTypeAutoConfigurationURL as String, kCFProxyTypeAutoConfigurationJavaScript as String:
+      } else if type == (kCFProxyTypeAutoConfigurationURL as String) || type == (kCFProxyTypeAutoConfigurationJavaScript as String) {
         result(["kind": "pac"])
-      case kCFProxyTypeSOCKS as String:
+      } else if type == (kCFProxyTypeSOCKS as String) {
         result(["kind": "socks"])
-      default:
+      } else {
         result(["kind": "unsupported"])
       }
     }
