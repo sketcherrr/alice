@@ -62,13 +62,18 @@ class OpenAiNetwork {
     }
     // Finder launches normally lack the terminal's environment. Consult CFNetwork
     // in that case instead of assuming that an absent env proxy means direct.
+    final variables = environment ?? Platform.environment;
+    final setting = target.scheme == 'http'
+        ? variables['http_proxy'] ?? variables['HTTP_PROXY']
+        : variables['https_proxy'] ?? variables['HTTPS_PROXY'];
     final envProxy = HttpClient.findProxyFromEnvironment(
       target,
-      environment: environment,
+      environment: variables,
     );
-    if (envProxy != 'DIRECT') {
+    if (setting != null && setting.isNotEmpty) {
+      // DIRECT can be an explicit NO_PROXY exception, not an absent setting.
       client.findProxy = (_) => envProxy;
-      return '环境变量代理';
+      return envProxy == 'DIRECT' ? '环境变量指定直接连接' : '环境变量代理';
     }
     final lookup = resolver ?? systemProxy;
     if (lookup != null) {

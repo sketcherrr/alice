@@ -16,6 +16,8 @@ Future<String> apiFailure(HttpClientResponse response, String key) async {
     if (body is Map && body['error'] is Map) {
       final error = body['error'] as Map;
       if (error['code'] is String) code = error['code'];
+      if (code == null && error['type'] == 'invalid_request_error')
+        code = 'invalid_request_error';
       if (code == null && error['type'] == 'insufficient_quota')
         code = 'insufficient_quota';
     }

@@ -85,6 +85,19 @@ Future<void> main() async {
   await OpenAiNetwork.configure(
     client,
     target,
+    environment: {
+      'https_proxy': 'localhost:8080',
+      'no_proxy': 'api.openai.com',
+    },
+    resolver: system,
+  );
+  check(
+    lookups == 1 && client.route!(target) == 'DIRECT',
+    'NO_PROXY is not overridden by the system proxy',
+  );
+  await OpenAiNetwork.configure(
+    client,
+    target,
     configuration: const NetworkSettings(mode: ProxyMode.direct),
     resolver: system,
   );
